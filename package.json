@@ -14,7 +14,7 @@
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",
-    "astro": "5.18.2"
+    "astro": "7.4.13"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",

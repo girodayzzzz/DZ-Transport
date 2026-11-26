@@ -15,5 +15,7 @@
 
 ## V3 review
 
+- Updated Astro to 7.4.13 to address the build dependency advisories found during review.
+
 - Added hosted-auth configuration, localized portals, transport operations and optional Cloudflare guest intake behind disabled flags.
 - Added PostgreSQL policy and workflow tests and post-deployment checks for the GitHub review preview.
