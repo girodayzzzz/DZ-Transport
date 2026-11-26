@@ -1,0 +1,76 @@
+---
+import settings from '../../config/site.json';
+import {t, booking} from '../lib/content';
+import {url} from '../lib/routes';
+import {copy, steps, pickup, delivery} from '../lib/form-copy';
+import {transport, location, cargo, regulated, schedule, customer, companyFields, partner, consents} from '../lib/form-schema.mjs';
+import {endpoint} from '../lib/form-core.mjs';
+import Field from './Field.astro';
+const {lang, kind} = Astro.props;
+const isPartner = kind === 'partner';
+const configured = isPartner ? settings.features.partners : settings.features.inquiries;
+const postTo = configured ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
+const strings = Object.fromEntries(Object.entries(copy).map(([key,value])=>[key,t(lang,value)]));
+---
+<form class="inquiry-form" data-workflow={kind} data-endpoint={postTo} data-confirmation={url(lang,'confirmation')} data-copy={JSON.stringify(strings)} novalidate>
+  {!postTo && <p class="notice">{strings.unavailable}</p>}
+  <noscript><p class="notice">{t(lang,['Za izpolnjevanje obrazca omogočite JavaScript.','Enable JavaScript to use this form.','Aktivieren Sie JavaScript, um das Formular zu verwenden.'])}</p></noscript>
+  {!isPartner && (
+    <div class="wizard-progress">
+      <p data-progress role="status">{strings.step} 1 {strings.of} 6</p>
+      <ol>{steps.map((name,index)=><li data-marker aria-current={index===0?'step':undefined}>{t(lang,name)}</li>)}</ol>
+      <progress max="6" value="1" aria-label={strings.step}></progress>
+    </div>
+  )}
+  {isPartner ? (
+    <section data-step>
+      <h2 tabindex="-1">{t(lang,['Prijava za sodelovanje','Apply to become a partner','Als Transportpartner bewerben'])}</h2>
+      <div class="form-grid" data-group="application">{partner.map(field=><Field {field} {lang}/>)}</div>
+      <div data-group="permission"><Field field={consents[0]} {lang}/><a href={url(lang,'privacy')}>{t(lang,['Politika zasebnosti','Privacy policy','Datenschutzerklärung'])}</a></div>
+    </section>
+  ) : (
+    <>
+      <section data-step><h2 tabindex="-1">{t(lang,steps[0])}</h2><div class="form-grid" data-group="type"><Field field={transport} {lang}/></div></section>
+      <section data-step hidden>
+        <h2 tabindex="-1">{t(lang,steps[1])}</h2>
+        <fieldset class="form-grid" data-group="pickup" data-title={t(lang,pickup)}><legend>{t(lang,pickup)}</legend>{location('pickup').map(field=><Field {field} {lang}/>)}</fieldset>
+        <fieldset class="form-grid" data-group="delivery" data-title={t(lang,delivery)}><legend>{t(lang,delivery)}</legend>{location('delivery').map(field=><Field {field} {lang}/>)}</fieldset>
+      </section>
+      <section data-step hidden>
+        <h2 tabindex="-1">{t(lang,steps[2])}</h2>
+        <div data-group="cargo">
+          {Object.entries(cargo).map(([category,fields])=><fieldset class="form-grid variant" data-cargo={category} hidden disabled>{fields.map(field=><Field {field} {lang} prefix={category+'-'}/>)}</fieldset>)}
+          <Field field={regulated} {lang}/>
+          <p class="notice" data-regulated hidden>{strings.manual}</p>
+        </div>
+      </section>
+      <section data-step hidden><h2 tabindex="-1">{t(lang,steps[3])}</h2><div class="form-grid" data-group="schedule">{schedule.map(field=><Field {field} {lang}/>)}</div></section>
+      <section data-step hidden>
+        <h2 tabindex="-1">{t(lang,steps[4])}</h2>
+        <div data-group="customer">
+          <div class="form-grid">{customer.slice(0,1).map(field=><Field {field} {lang}/>)}</div>
+          <fieldset data-company class="form-grid variant" hidden disabled>{companyFields.map(field=><Field {field} {lang}/>)}</fieldset>
+          <div class="form-grid">{customer.slice(1).map(field=><Field {field} {lang}/>)}</div>
+        </div>
+      </section>
+      <section data-step hidden>
+        <h2 tabindex="-1">{t(lang,steps[5])}</h2><div data-summary class="summary"></div>
+        <p class="notice">{t(lang,booking)}</p>
+        <div data-group="permission">
+          <Field field={consents[0]} {lang}/><a href={url(lang,'privacy')}>{t(lang,['Politika zasebnosti','Privacy policy','Datenschutzerklärung'])}</a>
+          <Field field={consents[1]} {lang}/>
+        </div>
+      </section>
+    </>
+  )}
+  <div hidden aria-hidden="true"><label>Website<input name="_gotcha" tabindex="-1" autocomplete="off"/></label></div>
+  <p data-form-error class="notice error" role="alert" hidden></p>
+  <div class="form-buttons">
+    {!isPartner && <><button class="button secondary" type="button" data-prev hidden>{strings.previous}</button><button class="button primary" type="button" data-next disabled>{strings.next}</button></>}
+    <button class="button primary" type="submit" data-send disabled hidden={!isPartner}>{isPartner ? strings.apply : strings.send}</button>
+  </div>
+</form>
+<script>
+  import { initializeForms } from '../lib/forms';
+  initializeForms();
+</script>

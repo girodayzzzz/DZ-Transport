@@ -1,0 +1,24 @@
+{
+  "name": "dz-transport",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "lint": "node scripts/lint.mjs && astro check",
+    "test": "node --test",
+    "verify": "node scripts/verify.mjs",
+    "test:browser": "playwright test"
+  },
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "astro": "5.18.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "@axe-core/playwright": "4.14.1",
+    "@playwright/test": "1.65.1",
+    "typescript": "5.9.3"
+  }
+}

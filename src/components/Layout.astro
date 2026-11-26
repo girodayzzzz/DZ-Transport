@@ -1,0 +1,122 @@
+---
+import '../styles/site.css';
+import company from '../../config/site.json';
+import {titles,intro,t,faq} from '../lib/content';
+import {asset,absolute,enabledLanguages,defaultLanguage,url,services,type Page,type Lang} from '../lib/routes';
+const {page,lang} = Astro.props as {page:Page,lang:Lang};
+const quote=t(lang,['Zahtevajte ponudbo','Request a Transport Quote','Transportangebot anfragen']);
+const canonical=absolute(url(lang,page),Astro.site);
+const title=t(lang,titles[page])+' | DZ Transport';
+const description=t(lang,intro[page]);
+const home=t(lang,['Domov','Home','Startseite']);
+const loc={sl:'sl_SI',en:'en_GB',de:'de_DE'};
+const organization={'@type':'Organization','@id':absolute(url(defaultLanguage,'home'),Astro.site)+'#organization',name:company.name,url:absolute(url(defaultLanguage,'home'),Astro.site),logo:absolute(asset('favicon.svg'),Astro.site),parentOrganization:{'@type':'Organization',name:company.parentName,url:company.parentUrl},...(company.email?{email:company.email}:{}),...(company.telephone?{telephone:company.telephone}:{})};
+const socials=Object.entries(company.socialLinks).filter(([,href])=>{
+ try {return typeof href==='string' && new URL(href).protocol==='https:';} catch {return false;}
+}) as [string,string][];
+if (socials.length) Object.assign(organization,{sameAs:socials.map(([,href])=>href)});
+const schema:object[]=[organization];
+if ((services as readonly string[]).includes(page)) schema.push({'@type':'Service',name:t(lang,titles[page]),description,provider:{'@id':organization['@id']},areaServed:['Slovenia','Europe'],url:canonical});
+if (page==='faq') schema.push({'@type':'FAQPage',mainEntity:faq.map(([q,a])=>({'@type':'Question',name:t(lang,q),acceptedAnswer:{'@type':'Answer',text:t(lang,a)}}))});
+if (page!=='home' && page!=='confirmation' && page!=='missing') {
+ const breadcrumb: Page[] = ['home', ...((services as readonly string[]).includes(page) ? ['services' as const] : []),page];
+ schema.push({'@type':'BreadcrumbList',itemListElement:breadcrumb.map((item,index)=>({
+  '@type':'ListItem',position:index+1,name:item==='home'?home:t(lang,titles[item]),item:absolute(url(lang,item),Astro.site)
+ }))});
+}
+const navGroups=[
+ {label:t(lang,titles.services),pages:['services',...services] as Page[]},
+ {label:t(lang,['Sodelovanje','Work with us','Zusammenarbeit']),pages:['business','partners'] as Page[]},
+ {label:t(lang,['Informacije','Information','Informationen']),pages:['process','faq','about','contact'] as Page[]}
+];
+const footerGroups=[['services','vehicle','pallet','cargo','moving','express','special'],['process','business','partners','faq','about','contact'],['privacy','terms','cookies']] as Page[][];
+const noindex=['missing','confirmation'].includes(page);
+---
+<!doctype html>
+<html lang={lang}>
+<head>
+ <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+ <meta name="theme-color" content="#0B1728"/><meta name="referrer" content="strict-origin-when-cross-origin"/>
+ <title>{title}</title><meta name="description" content={description}/>
+ {noindex ? <meta name="robots" content="noindex,follow"/> : <>
+  <link rel="canonical" href={canonical}/>
+  {enabledLanguages.map(language=><link rel="alternate" hreflang={language} href={absolute(url(language,page),Astro.site)}/>)}
+  <link rel="alternate" hreflang="x-default" href={absolute(url(defaultLanguage,page),Astro.site)}/>
+ </>}
+ <meta property="og:type" content="website"/><meta property="og:title" content={title}/>
+ <meta property="og:description" content={description}/><meta property="og:url" content={canonical}/>
+ <meta property="og:site_name" content={company.name}/><meta property="og:locale" content={loc[lang]}/>
+ <meta property="og:image" content={absolute(asset('images/road.jpg'),Astro.site)}/>
+ <meta name="twitter:card" content="summary_large_image"/>
+ <link rel="icon" href={asset('favicon.svg')} type="image/svg+xml"/>
+ {!noindex && <script type="application/ld+json" set:html={JSON.stringify({'@context':'https://schema.org','@graph':schema}).replace(/</g,'\\u003c')}/>}
+</head>
+<body>
+ <a class="skip" href="#main">{t(lang,['Preskoči na vsebino','Skip to content','Zum Inhalt springen'])}</a>
+ <header class="header">
+  <div class="topline"><div class="wrap"><span>{t(lang,['Slovenija in Evropa','Slovenia and Europe','Slowenien und Europa'])}</span><a href={company.parentUrl}>DZ Auto Trade</a>{socials.map(([name,href])=><a href={href}>{name}</a>)}</div></div>
+  <div class="wrap header-row">
+   <a class="brand" href={url(lang,'home')}><img src={asset('favicon.svg')} alt="" width="39" height="39"/><span>DZ <strong>TRANSPORT</strong></span></a>
+   <nav id="mobile-nav" class="navigation" data-navigation aria-label={t(lang,['Glavna navigacija','Main navigation','Hauptnavigation'])}>
+    <a href={url(lang,'home')} aria-current={page==='home'?'page':undefined}>{home}</a>
+    {navGroups.map(group=><details><summary>{group.label}</summary><div class="dropdown">{group.pages.map(item=><a href={url(lang,item)} aria-current={page===item?'page':undefined}>{t(lang,titles[item])}</a>)}</div></details>)}
+   </nav>
+   <div class="header-actions">
+    <details class="languages"><summary aria-label={t(lang,['Jezik','Language','Sprache'])}>{lang.toUpperCase()}</summary><div class="dropdown">
+     {enabledLanguages.map(language=><a data-language={language} lang={language} hreflang={language} href={url(language,page)} aria-current={lang===language?'page':undefined}>{({sl:'Slovenščina',en:'English',de:'Deutsch'})[language]}</a>)}
+    </div></details>
+    <a class="button primary header-quote" href={url(lang,'inquiry')}>{quote}</a>
+    <button class="menu-toggle" data-menu aria-controls="mobile-nav" aria-expanded="false" aria-label={t(lang,['Meni','Menu','Menü'])}><span></span><span></span><span></span></button>
+   </div>
+  </div>
+ </header>
+ <main id="main" tabindex="-1">
+  {page!=='home' && <div class="crumbs"><nav class="wrap" aria-label={t(lang,['Drobtinice','Breadcrumb','Brotkrümelnavigation'])}>
+   <a href={url(lang,'home')}>{home}</a><span aria-hidden="true">/</span>
+   {(services as readonly string[]).includes(page) && <><a href={url(lang,'services')}>{t(lang,titles.services)}</a><span aria-hidden="true">/</span></>}
+   <span aria-current="page">{t(lang,titles[page])}</span>
+  </nav></div>}
+  <slot/>
+ </main>
+ <footer class="footer">
+  <div class="wrap footer-main">
+   <div><a class="brand" href={url(lang,'home')}><img src={asset('favicon.svg')} alt="" width="40" height="40"/><span>DZ <strong>TRANSPORT</strong></span></a><p>{t(lang,titles.home)}</p><a href={company.parentUrl}>DZ Auto Trade</a>{socials.map(([name,href])=><a href={href}>{name}</a>)}</div>
+   {footerGroups.map((group,index)=><div><h2>{[t(lang,titles.services),t(lang,['O platformi','About the platform','Zur Plattform']),t(lang,['Pravne informacije','Legal information','Rechtliches'])][index]}</h2>{group.map(item=><a href={url(lang,item)}>{t(lang,titles[item])}</a>)}</div>)}
+  </div>
+  <div class="wrap copyright">© {new Date().getFullYear()} DZ Transport</div>
+ </footer>
+ {page!=='inquiry' && <a class="button primary mobile-quote" href={url(lang,'inquiry')}>{quote}</a>}
+ <script>
+  const nav=document.querySelector<HTMLElement>('[data-navigation]')!;
+  const menu=document.querySelector<HTMLButtonElement>('[data-menu]')!;
+  const toggle=(open:boolean)=>{
+   menu.setAttribute('aria-expanded',String(open));
+   nav.toggleAttribute('data-open',open);
+  };
+  menu.addEventListener('click',()=>toggle(menu.getAttribute('aria-expanded')!=='true'));
+  const closeDetails=(except?:Element)=>document.querySelectorAll<HTMLDetailsElement>('.header details[open]').forEach(details=>{if(details!==except) details.open=false});
+  for (const details of document.querySelectorAll<HTMLDetailsElement>('.header details')) details.addEventListener('toggle',()=>{if(details.open) closeDetails(details)});
+  document.addEventListener('click',event=>{if(event.target instanceof Element && !event.target.closest('.header details')) closeDetails()});
+  document.addEventListener('keydown',event=>{
+   if (event.key!=='Escape') return;
+   const expanded=document.querySelector<HTMLDetailsElement>('.header details[open]');
+   if (expanded) {
+    closeDetails();
+    expanded.querySelector('summary')?.focus();
+   } else if (menu.getAttribute('aria-expanded')==='true') {
+    toggle(false);
+    menu.focus();
+   }
+  });
+  for (const link of document.querySelectorAll<HTMLAnchorElement>('[data-language]')) link.addEventListener('click',()=>{
+   try {localStorage.setItem('dzt-language',link.dataset.language!)} catch {}
+  });
+  try {
+   const preferred=localStorage.getItem('dzt-language');
+   const current=document.querySelector<HTMLAnchorElement>('[data-language][aria-current]');
+   const requested=[...document.querySelectorAll<HTMLAnchorElement>('[data-language]')].find(link=>link.dataset.language===preferred);
+   if (requested && current && requested!==current && current.href===location.href && document.querySelector('[data-home]') && document.documentElement.lang==='sl') location.replace(requested.href);
+  } catch {}
+ </script>
+</body>
+</html>
