@@ -1,4 +1,5 @@
 ---
+import {isProduction} from '../lib/site-config.mjs';
 import {corridors} from '../lib/corridors';
 import settings from '../../config/site.json';
 import {intro,t,titles,faq,process,booking,serviceDetails} from '../lib/content';
@@ -48,7 +49,7 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
    </div>}
    {page==='process' && <><ol class="process vertical">{process.map((step,index)=><li><span>{index+1}</span>{t(lang,step)}</li>)}</ol><p class="notice">{t(lang,booking)}</p><a class="button primary" href={url(lang,'inquiry')}>{quote}</a></>}
    {page==='faq' && <div class="faq">{faq.map(([question,answer])=><details><summary>{t(lang,question)}</summary><p>{t(lang,answer)}</p></details>)}</div>}
-   {legal && import.meta.env.DZ_SITE_MODE !== 'production' && <p class="notice">{t(lang,['Osnutek za pregled upravljavca pred javno objavo.','Draft for operator review before public launch.','Entwurf zur Prüfung durch den Betreiber vor der Veröffentlichung.'])}</p>}
+   {legal && !isProduction && <p class="notice">{t(lang,['Osnutek za pregled upravljavca pred javno objavo.','Draft for operator review before public launch.','Entwurf zur Prüfung durch den Betreiber vor der Veröffentlichung.'])}</p>}
    {sections.length>0 && <div class="prose">{sections.map(([heading,body])=><section><h2>{t(lang,heading)}</h2><p>{t(lang,body)}</p></section>)}</div>}
    {(page==='privacy'||page==='terms'||page==='contact') && <div class="prose">
     <h2>{t(lang,['Podatki upravljavca','Operator details','Betreiberangaben'])}</h2>

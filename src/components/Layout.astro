@@ -1,7 +1,7 @@
 ---
 import '../styles/site.css';
 import company from '../../config/site.json';
-import {legalPages} from '../lib/site-config.mjs';
+import {isProduction, legalPages} from '../lib/site-config.mjs';
 import {titles,intro,t,faq} from '../lib/content';
 import {asset,absolute,enabledLanguages,defaultLanguage,url,services,type Page,type Lang} from '../lib/routes';
 const {page,lang} = Astro.props as {page:Page,lang:Lang};
@@ -31,7 +31,7 @@ const navGroups=[
  {label:t(lang,['Informacije','Information','Informationen']),pages:['process','faq','about','contact'] as Page[]}
 ];
 const footerGroups=[['services','vehicle','pallet','cargo','moving','express','special'],['process','business','partners','faq','about','contact'],['privacy','terms','cookies']] as Page[][];
-const preview=import.meta.env.DZ_SITE_MODE !== 'production';
+const preview=!isProduction;
 const analyticsToken=!preview && company.analytics.enabled && company.analytics.consentReviewed && /^[a-f0-9]{32}$/i.test(company.analytics.cloudflareToken)
  && !['inquiry','partners','confirmation','missing'].includes(page) ? company.analytics.cloudflareToken : '';
 const noindex=preview || ['missing','confirmation',...legalPages].includes(page);

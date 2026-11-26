@@ -1,6 +1,8 @@
 import settings from '../../config/site.json' with {type:'json'};
 import {endpoint, phoneValid} from './form-core.mjs';
 
+export const siteMode = process.env.DZ_SITE_MODE || 'preview';
+export const isProduction = siteMode === 'production';
 export const legalPages = ['privacy', 'terms', 'cookies'];
 
 export function configurationIssues(config, mode) {

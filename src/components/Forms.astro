@@ -1,4 +1,5 @@
 ---
+import {isProduction} from '../lib/site-config.mjs';
 import settings from '../../config/site.json';
 import {t, booking} from '../lib/content';
 import {url} from '../lib/routes';
@@ -9,7 +10,7 @@ import Field from './Field.astro';
 const {lang, kind} = Astro.props;
 const isPartner = kind === 'partner';
 const configured = isPartner ? settings.features.partners : settings.features.inquiries;
-const postTo = configured && import.meta.env.DZ_SITE_MODE === 'production' ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
+const postTo = configured && isProduction ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
 const strings = Object.fromEntries(Object.entries(copy).map(([key,value])=>[key,t(lang,value)]));
 ---
 <form class="inquiry-form" method="post" data-workflow={kind} data-endpoint={postTo} data-confirmation={url(lang,'confirmation')} data-copy={JSON.stringify(strings)} novalidate>
