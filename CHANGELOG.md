@@ -1,5 +1,11 @@
 # Changelog
 
+## V6 development deployment
+
+- Require successful build and database checks before publishing to Pages and verify localized routes and assets on the deployed URL.
+- Link to localized Login and Register availability pages from the preview.
+- Configure the production site origin and guest intake origin through deployment settings.
+
 ## V5 review
 
 - Audit merged V4 and stabilize private order assignment and carrier notification.

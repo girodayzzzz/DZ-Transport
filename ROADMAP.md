@@ -17,3 +17,8 @@ See the [V4 audit and continuation](docs/V4-AUDIT.md) for the customer onboardin
 ## V5 continuation
 
 See the [delivery matrix](docs/V5-DELIVERY.md) for the verified work and outstanding modules. Evidence-backed carrier verification and organization permissions precede broader marketplace rollout.
+
+
+## V6 continuation
+
+Complete the Pages owner settings and verify the public development URL first. Verify the existing Supabase deployment and approved carrier model before publishing marketplace questions. Establish moderated listing access and reporting, then implement order-gated messaging and the Communication Center. The [V5 audit and V6 delivery matrix](V5-AUDIT.md) tracks the remaining modules.

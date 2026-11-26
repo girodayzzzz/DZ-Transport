@@ -61,7 +61,7 @@ jobs:
           path: dist
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.PAGES_DEPLOY == 'true'
-    needs: build
+    needs: [build, database]
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -72,18 +72,17 @@ jobs:
     steps:
       - uses: actions/deploy-pages@v4
         id: deployment
-      - name: Verify deployed preview safeguards
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify deployed development site
         env:
           PREVIEW_URL: ${{ steps.deployment.outputs.page_url }}
-        run: |
-          for route in '' 'en/' 'de/' 'en/inquiry/' 'en/partners/' 'en/login/'; do
-            curl --fail --silent --show-error --retry 5 --retry-all-errors "${PREVIEW_URL%/}/${route}" -o /tmp/dz-deployed.html
-            grep -q 'name="robots" content="noindex,follow"' /tmp/dz-deployed.html
-            grep -q 'class="preview-status"' /tmp/dz-deployed.html
-            if grep -Eq 'data-endpoint="https?://|data-init=' /tmp/dz-deployed.html; then
-              exit 1
-            fi
-          done
+        run: node scripts/verify-pages.mjs
   database:
     runs-on: ubuntu-latest
     services:

@@ -76,6 +76,7 @@ const noindex=preview || isPortal(page) || ['missing','confirmation',...legalPag
    <nav id="mobile-nav" class="navigation" data-navigation aria-label={t(lang,['Glavna navigacija','Main navigation','Hauptnavigation'])}>
     <a href={url(lang,'home')} aria-current={page==='home'?'page':undefined}>{home}</a>
     {navGroups.map(group=><details><summary>{group.label}</summary><div class="dropdown">{group.pages.map(item=><a href={url(lang,item)} aria-current={page===item?'page':undefined}>{t(lang,titles[item])}</a>)}</div></details>)}
+    {preview && <a href={url(lang,'login')} aria-current={page==='login'?'page':undefined}>{t(lang,titles.login)}</a>}
    </nav>
    <div class="header-actions">
     {portalEnabled && <a href={url(lang,'login')}>{t(lang,titles.login)}</a>}
