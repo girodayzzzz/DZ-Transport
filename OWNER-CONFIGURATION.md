@@ -19,6 +19,10 @@ Use a reviewed change to `config/site.json` for public values. The default build
 4. Follow [DEPLOYMENT.md](DEPLOYMENT.md) for hosting. Enable the production build mode only after these inputs and legal review are complete.
 5. Leave analytics off by default. Set `analytics.enabled` and `analytics.consentReviewed` only if the owner confirms the beacon can run without an opt-in. Where opt-in is required, leave it off pending an approved consent flow. The optional integration measures page visits and performance on clean URLs. It excludes form and confirmation pages. Do not export form data or references to analytics.
 
+## Development website
+
+Complete the [GitHub Pages owner checklist](GITHUB-PAGES-SETUP.md) to publish the preview. Select the production origin separately when ready and follow the [domain migration guide](DOMAIN-MIGRATION.md).
+
 ## Portal and guest intake owner settings
 
 Use [Supabase setup](SUPABASE-SETUP.md) for region selection, SMTP, secure administrator provisioning, protected Cloudflare bindings, staged testing and feature activation. See [free-tier planning limits](FREE-TIER-LIMITS.md) and [backup and restore](BACKUP-AND-RESTORE.md).

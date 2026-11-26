@@ -25,7 +25,11 @@ const navigation=page==='login' ? ['register','forgot'] : page==='account' ? ['c
     <noscript><p>{labels.unavailable}</p></noscript>
     <div data-portal-body></div>
    </div>
-  </div> : <p>{labels.unavailable}</p>}
+  </div> : <div>
+    <p>{labels.unavailable}</p>
+    {page==='login' && <a href={links.register}>{labels.register}</a>}
+    {page==='register' && <a href={links.login}>{labels.login}</a>}
+  </div>}
  </section>
 </Layout>
 <style is:global>

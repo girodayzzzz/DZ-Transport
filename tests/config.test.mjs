@@ -18,7 +18,7 @@ test('production accepts distinct mock HTTPS endpoints and approved operator set
   privacy:{retention:'Fixture retention',provider:'Fixture processor'},
   endpoints:{inquiry:'https://example.invalid/inquiry',partner:'https://example.invalid/partner'}
  };
- assert.deepEqual(configurationIssues(configured,'production'),[]);
+ assert.deepEqual(configurationIssues(configured,'production',{siteUrl:'https://transport.example'}),[]);
  configured.endpoints.partner=configured.endpoints.inquiry;
- assert.deepEqual(configurationIssues(configured,'production'),['endpoints must be distinct']);
+ assert.deepEqual(configurationIssues(configured,'production',{siteUrl:'https://transport.example'}),['endpoints must be distinct']);
 });

@@ -1,6 +1,7 @@
 import {portalTitles} from './portal-copy';
 import {corridors} from './corridors';
 import settings from '../../config/site.json';
+import {siteUrl} from './site-config.mjs';
 
 export const languages = ['sl', 'en', 'de'] as const;
 export type Lang = typeof languages[number];
@@ -52,5 +53,5 @@ export const url = (lang:Lang, page:Page) => {
   return base() + '/' + (parts.length ? parts.join('/') + '/' : '');
 };
 export const asset = (path:string) => base() + '/' + path;
-export const absolute = (path:string, site?:URL) => new URL(path,site || settings.productionDomain).href;
+export const absolute = (path:string, site?:URL) => new URL(path,site || siteUrl).href;
 export const localized = (lang:Lang, values:readonly string[]) => values[position(lang)];

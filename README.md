@@ -10,7 +10,7 @@ A static, multilingual transport inquiry site for Slovenia and Europe. DZ Transp
 | Hosting | GitHub Pages review preview and Cloudflare Pages production |
 | Data | Supabase backs the optional authenticated portal and private transport workflows. |
 
-See the [V5 delivery matrix](docs/V5-DELIVERY.md) and [Quick Deal setup](QUICK-DEAL.md).
+See the [V1–V5 audit and V6 delivery matrix](V5-AUDIT.md), [GitHub Pages owner setup](GITHUB-PAGES-SETUP.md) and [Quick Deal setup](QUICK-DEAL.md).
 
 ## Run locally
 
@@ -34,7 +34,7 @@ npm run test:browser
 
 ## Source map
 
-- `config/site.json` contains operator details, endpoints, active languages, feature flags and domain settings.
+- `config/site.json` contains operator details, endpoints, active languages and feature flags. Set the origin and base path using `SITE_URL` and `BASE_PATH`.
 - `src/lib/routes.ts` defines the routes and language-specific slugs.
 - `src/lib/content.ts`, `editorial.ts`, `form-copy.ts` and `form-schema.mjs` define localized content and form fields.
 - `src/components/` contains the shared layout, page templates, form controls and transport cards.

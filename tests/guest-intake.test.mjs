@@ -37,9 +37,9 @@ test('guest intake verifies each section and recalculates item totals',()=>{
 });
 
 test('guest endpoint requires approved origin, Turnstile and a confirmed database receipt',async t=>{
- const origin='https://transport.dzautotrade.si';
+ const origin='https://transport.example';
  const env={
-  DZ_GUEST_INTAKE:'true',TURNSTILE_SECRET:'test',DZ_IP_HASH_KEY:'x'.repeat(32),
+  DZ_GUEST_INTAKE:'true',DZ_SITE_ORIGIN:origin,TURNSTILE_SECRET:'test',DZ_IP_HASH_KEY:'x'.repeat(32),
   SUPABASE_URL:'https://test-ref.supabase.co',SUPABASE_SECRET_KEY:'stub'
  };
  const request=(override={})=>new Request(origin+'/api/inquiry',{
@@ -47,11 +47,12 @@ test('guest endpoint requires approved origin, Turnstile and a confirmed databas
   body:JSON.stringify({...fixture(),turnstileToken:'test-turnstile-token'})
  });
  assert.equal((await onRequest({request:request(),env:{}})).status,404);
+ assert.equal((await onRequest({request:request(),env:{...env,DZ_SITE_ORIGIN:''}})).status,404);
  assert.equal((await onRequest({request:request({Origin:'https://invalid.example'}),env})).status,403);
  let outcome='invalid';
  let databaseCalls=0;
  t.mock.method(globalThis,'fetch',async (url,options)=>{
-  if(url.includes('siteverify')) return Response.json({success:outcome!=='invalid',hostname:'transport.dzautotrade.si',action:'guest-inquiry'});
+  if(url.includes('siteverify')) return Response.json({success:outcome!=='invalid',hostname:new URL(origin).hostname,action:'guest-inquiry'});
   databaseCalls++;
   const payload=JSON.parse(options.body);
   assert.match(payload.p_network,/^[0-9a-f]{64}$/);

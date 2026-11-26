@@ -106,9 +106,9 @@ test('long German footer labels fit on narrow pages',async({page})=>{
  }
 });
 
-test('all transport categories select the right conditional fields and show validation',async({page})=>{
- await useFiles(page);
- for(const category of Object.keys(grouping)){
+for (const category of Object.keys(grouping)) {
+ test(category+' selects the right conditional fields and shows validation',async({page})=>{
+  await useFiles(page);
   await page.goto(path('/en/inquiry/'));
   await btn(page,'Next').click();
   await expect(page.getByText('Complete this field.',{exact:true})).toBeVisible();
@@ -125,8 +125,8 @@ test('all transport categories select the right conditional fields and show vali
   await byName(page,'flexible').check();
   await btn(page,'Next').click();
   await expect(page.getByRole('heading',{name:'Customer information'})).toBeVisible();
- }
-});
+ });
+}
 
 test('a failed inquiry retains data, retry retains the reference, accepted inquiry redirects once',async({page})=>{
  await useFiles(page,{configured:true});
@@ -265,6 +265,12 @@ test('portal preview is unavailable and noindexed in all locales',async({page})=
   await expect(page.getByText(message)).toBeVisible();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content','noindex,follow');
   await expect(page.locator('[data-portal][data-init]')).toHaveCount(0);
+  const register = page.locator('[data-portal] a');
+  await register.click();
+  await expect(page.locator('[data-portal="register"]')).toBeVisible();
+  await expect(page.locator('[data-portal][data-init]')).toHaveCount(0);
+  await page.locator('[data-portal] a').click();
+  await expect(page).toHaveURL(path(suffix));
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
  }
 });

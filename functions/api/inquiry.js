@@ -1,7 +1,6 @@
 import {validateGuestInquiry} from '../../src/lib/guest-intake.mjs';
 
-const host = 'transport.dzautotrade.si';
-const origin = 'https://' + host;
+import {httpsOrigin} from '../../src/lib/site-origin.mjs';
 const maxBytes=32768;
 const reply=(status,body)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 
@@ -29,7 +28,8 @@ async function networkKey(secret,ip) {
 }
 
 export async function onRequest({request,env}) {
- if (env.DZ_GUEST_INTAKE!=='true' || new URL(request.url).origin!==origin) return reply(404,{ok:false});
+ const origin = httpsOrigin(env.DZ_SITE_ORIGIN);
+ if (!origin || env.DZ_GUEST_INTAKE!=='true' || new URL(request.url).origin!==origin) return reply(404,{ok:false});
  if (request.method!=='POST') return reply(405,{ok:false});
  if (request.headers.get('Origin')!==origin || request.headers.get('Sec-Fetch-Site')==='cross-site') return reply(403,{ok:false});
  if(request.headers.get('content-type')?.split(';')[0]!=='application/json') return reply(415,{ok:false});
@@ -54,7 +54,7 @@ export async function onRequest({request,env}) {
   });
   if(!verified.ok) return reply(503,{ok:false});
   const challenge=await verified.json();
-  if(challenge.success!==true || challenge.hostname!==host || challenge.action!=='guest-inquiry') return reply(403,{ok:false});
+  if(challenge.success!==true || challenge.hostname!==new URL(origin).hostname || challenge.action!=='guest-inquiry') return reply(403,{ok:false});
   const route=(place,prefix)=>[place[prefix+'City'],place[prefix+'Postal'],place[prefix+'Country']].join(' · ').slice(0,250);
   const database=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/ingest_guest_inquiry',{
    method:'POST',redirect:'error',signal:AbortSignal.timeout(8000),

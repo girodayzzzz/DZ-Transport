@@ -13,7 +13,7 @@ const configured = isPartner ? settings.features.partners : settings.features.in
 const useSupabase = !isPartner && configured && isProduction && import.meta.env.PUBLIC_DZ_GUEST_INTAKE==='true';
 const siteKey = useSupabase ? import.meta.env.PUBLIC_TURNSTILE_SITE_KEY : '';
 if (useSupabase && !/^[A-Za-z0-9_-]{12,100}$/.test(siteKey || '')) throw new Error('Guest intake requires a Turnstile site key');
-const postTo = useSupabase ? new URL('/api/inquiry',settings.productionDomain).href : configured && isProduction ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
+const postTo = useSupabase ? new URL('/api/inquiry',Astro.site).href : configured && isProduction ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
 const strings = Object.fromEntries(Object.entries(copy).map(([key,value])=>[key,t(lang,value)]));
 ---
 <form class="inquiry-form" method="post" data-workflow={kind} data-endpoint={postTo} data-turnstile={siteKey || undefined} data-confirmation={url(lang,'confirmation')} data-copy={JSON.stringify(strings)} novalidate>

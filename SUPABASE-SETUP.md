@@ -11,7 +11,7 @@ Reuse the existing DZ Transport Supabase project, reference `hgnwrtqpjxhidzeemaq
 
 ## Configure URLs and mail
 
-5. In **Authentication → URL Configuration**, set Site URL to `https://transport.dzautotrade.si`. Add the exact HTTPS paths below to the redirect allowlist. Use the equivalent staging host in the staging project, and avoid wildcard redirects.
+5. In **Authentication → URL Configuration**, set Site URL to the approved HTTPS production origin. Add the exact HTTPS paths below to the redirect allowlist. Use the equivalent staging host in the staging project, and avoid wildcard redirects.
 
 | Language | Verification and recovery | Optional Google callback |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ Reuse the existing DZ Transport Supabase project, reference `hgnwrtqpjxhidzeemaq
 ## Bind Cloudflare configuration
 
 9. Copy the hosted project URL and **publishable** key from the project’s Connect/API Keys panel into the Pages production build environment as `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Keep feature flags false until owner-approved. Configure the static build as described in [Deployment](DEPLOYMENT.md).
-10. For the optional guest endpoint, create a Turnstile widget bound to the production domain. Use its public key as `PUBLIC_TURNSTILE_SITE_KEY`. Add protected Pages Function bindings for `SUPABASE_URL`, the modern `SUPABASE_SECRET_KEY`, `TURNSTILE_SECRET`, and a high-entropy `DZ_IP_HASH_KEY` of at least 32 characters. Use separate secrets for an already approved staging project and production. The committed endpoint checks the production hostname. In an isolated staging checkout, change the hostname check and stage fixtures before testing a preproduction URL. Roll back to Formspree by disabling both guest flags and redeploying with the approved Formspree inquiry URL.
+10. For the optional guest endpoint, create a Turnstile widget bound to the production domain. Use its public key as `PUBLIC_TURNSTILE_SITE_KEY`. Add protected Pages Function bindings for `SUPABASE_URL`, the modern `SUPABASE_SECRET_KEY`, `TURNSTILE_SECRET`, and a high-entropy `DZ_IP_HASH_KEY` of at least 32 characters. Use separate secrets for an already approved staging project and production. Set the Function binding `DZ_SITE_ORIGIN` to the same approved HTTPS origin as the build’s `SITE_URL`. For an approved rehearsal, use the rehearsal origin and a Turnstile widget authorized for its hostname. Roll back to Formspree by disabling both guest flags and redeploying with the approved Formspree inquiry URL.
 11. Deploy and validate the function with synthetic submissions before switching public intake to it. Set runtime `DZ_GUEST_INTAKE=true` to enable the endpoint and set build variable `PUBLIC_DZ_GUEST_INTAKE=true` after acceptance. Keep the approved public partner endpoint separate. Review the Function’s 32 KiB request cap and the rate of eight accepted submissions per network hash per hour.
 
 ## Create the first administrator

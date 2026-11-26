@@ -5,7 +5,9 @@ import config from '../config/site.json' with {type:'json'};
 
 const dir='dist';
 const base=(process.env.BASE_PATH||'/').replace(/\/$/,'');
-const origin=new URL(process.env.SITE_URL||config.productionDomain).origin;
+import {siteUrl} from '../src/lib/site-config.mjs';
+
+const origin=new URL(siteUrl).origin;
 const files=readdirSync(dir,{recursive:true}).filter(file=>file.endsWith('.html'));
 const ids=new Map();
 for (const file of files) {
