@@ -9,3 +9,5 @@ Mail confirmation and recovery use one-time token hashes in URL fragments. Googl
 Account settings allow display name changes and submitting a deletion request. The owner handles account deletion after verifying identity and retention obligations. Notifications are in-app. A later email worker can use a dedicated private outbox and an approved provider with retry and delivery tests. Auth SMTP and mail notifications have separate purposes.
 
 See [Supabase setup](SUPABASE-SETUP.md) for external configuration and [Security testing](SECURITY-TESTING.md) for the hosted rehearsal.
+
+Enable the customer onboarding wizard with `PUBLIC_DZ_CUSTOMER_ONBOARDING=true` after applying migration 005 and verifying the staged flow. Existing customers can complete the wizard without changing ownership of inquiries or orders. The account-type step is persisted to the profile and resumes on return. Choosing Free completes setup without payment details. The browser flag controls whether the wizard is shown and is independent of database authorization. See [Google OAuth setup](GOOGLE-OAUTH-SETUP.md).

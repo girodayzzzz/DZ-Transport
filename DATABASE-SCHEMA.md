@@ -19,3 +19,7 @@ Inquiry and quote rows serialize changes via row locks. The order, quote and ass
 Guest ownership is never inferred from email or a reference. Guest inquiries remain unlinked. Account claiming, document storage policies, multiple carriers on one order, re-quotation after withdrawal and automated accounting are future work. The manager’s working lists and client-side filters currently use the latest 100 results per query. Dashboard counts and financial aggregates run over all authorized records.
 
 Archiving is reversible operationally through trusted SQL. The private purge function and the deletion-request workflow require an approved retention and legal-hold review. Foreign keys cascade or clear ownership according to record type. See [Backup and restore](BACKUP-AND-RESTORE.md).
+
+Migration `202611260005_customer_onboarding.sql` adds customer classification, registered business name when applicable and a completion timestamp to `profiles`. Existing profiles keep null onboarding columns until the customer enrolls. The V3 profile RLS remains in place. Confirmed users can choose an account classification and complete free onboarding through owner-scoped RPCs. The RPCs leave role grants and partner approval independent. Completion is retry-safe and the selected classification is locked after completion.
+
+For application rollback, disable `PUBLIC_DZ_CUSTOMER_ONBOARDING` and rebuild. The migration is additive and can remain applied with the existing application. Preserve recorded classifications in backups before considering any later schema removal.

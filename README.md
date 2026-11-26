@@ -71,3 +71,5 @@ The static Astro preview retains the public site and disables live submissions a
 - [Supabase setup](SUPABASE-SETUP.md) and [authentication](AUTHENTICATION.md)
 - [Database schema](DATABASE-SCHEMA.md) and [security testing](SECURITY-TESTING.md)
 - [Manager guide](ADMIN-GUIDE.md), [free-tier limits](FREE-TIER-LIMITS.md) and [backup and restore](BACKUP-AND-RESTORE.md)
+
+See the [V4 repository audit and delivery status](docs/V4-AUDIT.md) and [Google OAuth setup](GOOGLE-OAUTH-SETUP.md) for the staged customer onboarding rollout.

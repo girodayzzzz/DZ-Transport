@@ -2,7 +2,7 @@
 
 ## GitHub Pages review preview
 
-The legacy source setting runs a Jekyll workflow. Run 45881100243 failed on Astro front matter in `src/pages/404.astro`. The Astro verification on the same main commit passed in run 45881100027. GitHub denied integration writes to Pages settings and Actions variables, so a repository administrator needs to perform steps 2 and 3.
+The legacy source setting runs a Jekyll workflow. The V3 main run 45885091523 failed on Astro front matter, while Astro verification and database tests passed in run 45885091312 and deployment was skipped. Run 45881100243 failed on Astro front matter in `src/pages/404.astro`. The Astro verification on the same main commit passed in run 45881100027. GitHub denied integration writes to Pages settings and Actions variables, so a repository administrator needs to perform steps 2 and 3.
 
 1. Merge the reviewed pull request into `main`.
 2. In Settings → Pages → Build and deployment, select **GitHub Actions**.

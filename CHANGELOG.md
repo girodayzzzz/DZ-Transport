@@ -1,4 +1,9 @@
 # Changelog
+## V4 foundation
+
+- Add flagged, resumable private and business customer onboarding and cardless activation.
+- Add Google to the registration page and document the hosted OAuth rehearsal.
+
 
 ## V2 (unreleased)
 

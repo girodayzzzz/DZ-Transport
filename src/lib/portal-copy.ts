@@ -14,6 +14,16 @@ export const portalTitles = {
 };
 
 export const portalCopy = {
+ chooseAccountType:['Izberite vrsto računa','Choose your account type','Wählen Sie Ihren Kontotyp'],
+ accountType:['Vrsta računa','Account type','Kontotyp'],
+ privateCustomer:['Zasebna stranka','Private customer','Privatkunde'],
+ businessCustomer:['Poslovna stranka','Business customer','Geschäftskunde'],
+ continueSetup:['Nadaljuj','Continue','Weiter'],
+ completeCustomerProfile:['Dopolnite profil','Complete your profile','Vervollständigen Sie Ihr Profil'],
+ freeCustomerSetup:['Brezplačni račun ne zahteva plačilne kartice.','The free account requires no payment card.','Für das kostenlose Konto ist keine Zahlungskarte erforderlich.'],
+ registeredBusinessName:['Registrirano ime podjetja','Registered business name','Eingetragener Firmenname'],
+ activateFree:['Aktiviraj brezplačni račun','Activate free account','Kostenloses Konto aktivieren'],
+ changeAccountType:['Spremeni vrsto računa','Change account type','Kontotyp ändern'],
  unavailable: ['Portal še ni na voljo.','The portal is currently unavailable.','Das Portal ist derzeit nicht verfügbar.'],
  error: ['Dejanje ni uspelo. Preverite podatke ali poskusite pozneje.','The request failed. Check your details or try again later.','Die Anfrage ist fehlgeschlagen. Prüfen Sie Ihre Angaben oder versuchen Sie es später erneut.'],
  working: ['Obdelava …','Working …','Wird bearbeitet …'],
