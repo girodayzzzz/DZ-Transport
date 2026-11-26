@@ -12,3 +12,8 @@
 - Added the localized static website, service pages, business and partner pages and legal drafts.
 - Added quote prefill, conditional inquiry wizard, separate partner application, validation, review and provider-confirmed submission handling.
 - Added technical SEO, a custom 404, responsive navigation, automated checks and a gated GitHub Pages workflow.
+
+## V3 review
+
+- Added hosted-auth configuration, localized portals, transport operations and optional Cloudflare guest intake behind disabled flags.
+- Added PostgreSQL policy and workflow tests and post-deployment checks for the GitHub review preview.

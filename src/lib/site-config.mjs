@@ -5,7 +5,7 @@ export const siteMode = process.env.DZ_SITE_MODE || 'preview';
 export const isProduction = siteMode === 'production';
 export const legalPages = ['privacy', 'terms', 'cookies'];
 
-export function configurationIssues(config, mode) {
+export function configurationIssues(config, mode, options = {}) {
  const issues = [];
  if (!['preview', 'production'].includes(mode)) return ['DZ_SITE_MODE'];
  if (mode === 'preview') return issues;
@@ -19,14 +19,15 @@ export function configurationIssues(config, mode) {
  if (!config.privacy.provider?.trim()) issues.push('privacy.provider');
  if (!config.legal.contractualRole?.trim()) issues.push('legal.contractualRole');
  if (!config.legal.approvalReference?.trim()) issues.push('legal.approvalReference');
- for (const kind of ['inquiry', 'partner']) {
-  if (!endpoint(config.endpoints[kind])) issues.push('endpoints.' + kind);
- }
- if (config.endpoints.inquiry && endpoint(config.endpoints.inquiry) === endpoint(config.endpoints.partner)) issues.push('endpoints must be distinct');
+ const inquiry = options.guestIntake ? new URL('/api/inquiry',config.productionDomain).href : endpoint(config.endpoints.inquiry);
+ if (!inquiry) issues.push('endpoints.inquiry');
+ const partner = endpoint(config.endpoints.partner);
+ if (!partner) issues.push('endpoints.partner');
+ if (inquiry && inquiry === partner) issues.push('endpoints must be distinct');
  return issues;
 }
 
-export function assertConfiguration(mode, config = settings) {
- const issues = configurationIssues(config, mode);
+export function assertConfiguration(mode, config = settings, options = {}) {
+ const issues = configurationIssues(config, mode, options);
  if (issues.length) throw new Error('DZ Transport configuration requires: ' + issues.join(', '));
 }

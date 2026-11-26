@@ -10,10 +10,13 @@ import Field from './Field.astro';
 const {lang, kind} = Astro.props;
 const isPartner = kind === 'partner';
 const configured = isPartner ? settings.features.partners : settings.features.inquiries;
-const postTo = configured && isProduction ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
+const useSupabase = !isPartner && configured && isProduction && import.meta.env.PUBLIC_DZ_GUEST_INTAKE==='true';
+const siteKey = useSupabase ? import.meta.env.PUBLIC_TURNSTILE_SITE_KEY : '';
+if (useSupabase && !/^[A-Za-z0-9_-]{12,100}$/.test(siteKey || '')) throw new Error('Guest intake requires a Turnstile site key');
+const postTo = useSupabase ? new URL('/api/inquiry',settings.productionDomain).href : configured && isProduction ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
 const strings = Object.fromEntries(Object.entries(copy).map(([key,value])=>[key,t(lang,value)]));
 ---
-<form class="inquiry-form" method="post" data-workflow={kind} data-endpoint={postTo} data-confirmation={url(lang,'confirmation')} data-copy={JSON.stringify(strings)} novalidate>
+<form class="inquiry-form" method="post" data-workflow={kind} data-endpoint={postTo} data-turnstile={siteKey || undefined} data-confirmation={url(lang,'confirmation')} data-copy={JSON.stringify(strings)} novalidate>
   {!postTo && <p class="notice">{strings.unavailable}</p>}
   <noscript><p class="notice">{t(lang,['Za izpolnjevanje obrazca omogočite JavaScript.','Enable JavaScript to use this form.','Aktivieren Sie JavaScript, um das Formular zu verwenden.'])}</p></noscript>
   {!isPartner && (
@@ -82,6 +85,7 @@ const strings = Object.fromEntries(Object.entries(copy).map(([key,value])=>[key,
   )}
   <div hidden aria-hidden="true"><label>Website<input name="_gotcha" tabindex="-1" autocomplete="off"/></label></div>
   <p data-form-error class="notice error" role="alert" hidden></p>
+  {useSupabase && <div data-human-check hidden></div>}
   <div class="form-buttons">
     {!isPartner && <><button class="button secondary" type="button" data-prev hidden>{strings.previous}</button><button class="button primary" type="button" data-next disabled>{strings.next}</button></>}
     <button class="button primary" type="submit" data-send disabled hidden={!isPartner}>{isPartner ? strings.apply : strings.send}</button>

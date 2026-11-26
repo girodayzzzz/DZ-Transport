@@ -11,3 +11,7 @@ GitHub Pages is static. It does not provide application-side access controls or 
 ## Intake receipts and retries
 
 Production sends to distinct public HTTPS endpoints with credentials omitted. Confirmation requires a positive JSON receipt. The browser reuses a reference for an unchanged retry. Authoritative deduplication belongs to the provider or private intake API. See [DZ Transport Manager](docs/DZ-TRANSPORT-MANAGER.md) for the proposed transaction and receipt contract.
+
+## V3 authorization
+
+The portal uses Supabase RLS and transactional RPCs. The Transport Manager requires a pre-provisioned administrator grant and AAL2. Private guest intake verifies Turnstile before calling a service-only database function. See [authentication](AUTHENTICATION.md) and [security tests](SECURITY-TESTING.md) for the design, review steps and launch limitations.

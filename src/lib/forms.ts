@@ -1,3 +1,4 @@
+import {loadTurnstile} from './turnstile';
 import { grouping } from './form-schema.mjs';
 import { cargoTotals, localDate, scheduleError, phoneValid, reference, payload, emailDetails, submit } from './form-core.mjs';
 
@@ -24,6 +25,27 @@ function initialize(form:HTMLFormElement) {
  let fingerprint = '';
  let meta = {};
  const endpoint = form.dataset.endpoint!;
+ const siteKey=form.dataset.turnstile;
+ const challenge=form.querySelector<HTMLElement>('[data-human-check]');
+ let token='';
+ let resetChallenge:(()=>void)|undefined;
+ let challengeStarted=false;
+ async function startChallenge() {
+  if(!challenge || !siteKey || challengeStarted) return;
+  challengeStarted=true;
+  try {
+   const widget=await loadTurnstile();
+   const id=widget.render(challenge,{sitekey:siteKey,action:'guest-inquiry',language:document.documentElement.lang,
+    callback:result=>{token=result;refresh();},
+    'expired-callback':()=>{token='';refresh();},
+    'error-callback':()=>{token='';refresh();error.textContent=strings.failed;error.hidden=false;}
+   });
+   resetChallenge=()=>widget.reset(id);
+  } catch {
+   error.textContent=strings.failed;
+   error.hidden=false;
+  }
+ }
  const query = new URLSearchParams(location.search);
  const markers = [...form.querySelectorAll('[data-marker]')];
 
@@ -102,7 +124,7 @@ function initialize(form:HTMLFormElement) {
   if (query.has('urgent') && values().transportCategory === 'express') (form.elements.namedItem('urgent') as HTMLInputElement).checked=true;
   next!.disabled=false;
  }
- send.disabled=!endpoint;
+ send.disabled=!endpoint || working || Boolean(siteKey && !token);
 
  function refresh() {
   const current = values();
@@ -233,6 +255,10 @@ function initialize(form:HTMLFormElement) {
   previous!.hidden=index===0;
   next!.hidden=index===steps.length-1;
   send.hidden=!next!.hidden;
+  if(challenge) {
+   challenge.hidden=send.hidden;
+   if(!challenge.hidden) void startChallenge();
+  }
   if (!send.hidden) summary();
   get(steps[index],'h2').focus();
  }
@@ -257,7 +283,7 @@ function initialize(form:HTMLFormElement) {
    next!.click();
    return;
   }
-  if (working || finished || !endpoint) return;
+  if (working || finished || !endpoint || siteKey && !token) return;
   refresh();
   error.hidden=true;
   for (let index=0;index<steps.length;index++) {
@@ -281,7 +307,7 @@ function initialize(form:HTMLFormElement) {
    meta={kind,reference:reference(),submittedAt:new Date().toISOString(),language:document.documentElement.lang};
   }
   const data=payload(meta,grouped,current);
-  const details=emailDetails(data);
+  const outbound=siteKey ? {...data,turnstileToken:token} : {...data,_subject:'DZ Transport | '+data.reference,inquiryDetails:emailDetails(data)};
   working=true;
   send.disabled=true;
   if (previous) previous.disabled=true;
@@ -291,7 +317,7 @@ function initialize(form:HTMLFormElement) {
   const label=send.textContent;
   send.textContent=strings.sending;
   try {
-   const accepted=await submit(endpoint,{...data,_subject:'DZ Transport | '+data.reference,inquiryDetails:details});
+   const accepted=await submit(endpoint,outbound);
    if (!accepted) throw new Error('Rejected');
    finished=true;
    try {
@@ -313,6 +339,7 @@ function initialize(form:HTMLFormElement) {
    form.removeAttribute('aria-busy');
    send.textContent=label;
    if (!finished) {
+    if(resetChallenge) {token='';resetChallenge();}
     for (const control of locked) control.disabled=false;
     refresh();
     error.tabIndex=-1;

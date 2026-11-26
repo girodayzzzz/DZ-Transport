@@ -3,7 +3,7 @@ import '../styles/site.css';
 import company from '../../config/site.json';
 import {isProduction, legalPages} from '../lib/site-config.mjs';
 import {titles,intro,t,faq} from '../lib/content';
-import {asset,absolute,enabledLanguages,defaultLanguage,url,services,type Page,type Lang} from '../lib/routes';
+import {asset,absolute,isPortal,enabledLanguages,defaultLanguage,url,services,type Page,type Lang} from '../lib/routes';
 const {page,lang} = Astro.props as {page:Page,lang:Lang};
 const quote=t(lang,['Zahtevajte ponudbo','Request a Transport Quote','Transportangebot anfragen']);
 const canonical=absolute(url(lang,page),Astro.site);
@@ -32,15 +32,16 @@ const navGroups=[
 ];
 const footerGroups=[['services','vehicle','pallet','cargo','moving','express','special'],['process','business','partners','faq','about','contact'],['privacy','terms','cookies']] as Page[][];
 const preview=!isProduction;
+const portalEnabled=isProduction && import.meta.env.PUBLIC_DZ_PORTAL === 'true';
 const analyticsToken=!preview && company.analytics.enabled && company.analytics.consentReviewed && /^[a-f0-9]{32}$/i.test(company.analytics.cloudflareToken)
- && !['inquiry','partners','confirmation','missing'].includes(page) ? company.analytics.cloudflareToken : '';
-const noindex=preview || ['missing','confirmation',...legalPages].includes(page);
+ && !isPortal(page) && !['inquiry','partners','confirmation','missing'].includes(page) ? company.analytics.cloudflareToken : '';
+const noindex=preview || isPortal(page) || ['missing','confirmation',...legalPages].includes(page);
 ---
 <!doctype html>
 <html lang={lang}>
 <head>
  <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
- <meta name="theme-color" content="#0B1728"/><meta name="referrer" content="strict-origin-when-cross-origin"/>
+ <meta name="theme-color" content="#0B1728"/><meta name="referrer" content={isPortal(page) ? "no-referrer" : "strict-origin-when-cross-origin"}/>
  <title>{title}</title><meta name="description" content={description}/>
  {noindex ? <meta name="robots" content="noindex,follow"/> : <>
   <link rel="canonical" href={canonical}/>
@@ -77,6 +78,7 @@ const noindex=preview || ['missing','confirmation',...legalPages].includes(page)
     {navGroups.map(group=><details><summary>{group.label}</summary><div class="dropdown">{group.pages.map(item=><a href={url(lang,item)} aria-current={page===item?'page':undefined}>{t(lang,titles[item])}</a>)}</div></details>)}
    </nav>
    <div class="header-actions">
+    {portalEnabled && <a href={url(lang,'login')}>{t(lang,titles.login)}</a>}
     <details class="languages"><summary aria-label={t(lang,['Jezik','Language','Sprache'])}>{lang.toUpperCase()}</summary><div class="dropdown">
      {enabledLanguages.map(language=><a data-language={language} lang={language} hreflang={language} href={url(language,page)} aria-current={lang===language?'page':undefined}>{({sl:'Slovenščina',en:'English',de:'Deutsch'})[language]}</a>)}
     </div></details>

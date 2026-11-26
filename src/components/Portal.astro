@@ -1,0 +1,62 @@
+---
+import Layout from './Layout.astro';
+import {isProduction} from '../lib/site-config.mjs';
+import {portalConfiguration} from '../lib/portal-config.mjs';
+import {portalCopy,portalTitles,statusLabels} from '../lib/portal-copy';
+import {localized,url,type Lang,type PortalPage} from '../lib/routes';
+const {lang,page}=Astro.props as {lang:Lang,page:PortalPage};
+const configuration=portalConfiguration(import.meta.env,isProduction);
+const active=configuration && (page!=='manager' || configuration.manager) && (page!=='carrier' || configuration.partner);
+const labels=Object.fromEntries(Object.entries({...portalCopy,...portalTitles,...statusLabels}).map(([key,values])=>[key,localized(lang,values)]));
+const links=Object.fromEntries(Object.keys(portalTitles).map(key=>[key,url(lang,key as PortalPage)]));
+const navigation=page==='login' ? ['register','forgot'] : page==='account' ? ['customer','carrier','manager','deletion','logout'] : ['customer','account','logout'];
+---
+<Layout {lang} {page}>
+ <section class="page-hero"><div class="wrap"><h1>{labels[page]}</h1></div></section>
+ <section class="section wrap portal" data-portal={page} data-init={active ? JSON.stringify({configuration,labels,links}) : undefined}>
+  {active ? <div class="portal-grid">
+   <nav class="portal-links" aria-label={labels.account}>
+    {page!=='login' && page!=='logout' && <a href={links.login}>{labels.login}</a>}
+    {navigation.filter(key=>(key!=='manager' || configuration.manager) && (key!=='carrier' || configuration.partner)).map(key=><a href={links[key]}>{labels[key]}</a>)}
+    <a href={url(lang,'contact')}>{labels.support}</a>
+   </nav>
+   <div class="portal-content">
+    <p role="status" data-portal-status>{labels.working}</p>
+    <noscript><p>{labels.unavailable}</p></noscript>
+    <div data-portal-body></div>
+   </div>
+  </div> : <p>{labels.unavailable}</p>}
+ </section>
+</Layout>
+<style is:global>
+ .portal-content {min-width:0}
+ .portal-links {display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1rem}
+ .portal-links a {text-decoration:underline}
+ .portal [data-portal-body] {display:grid;gap:1.5rem}
+ .portal form {display:grid;gap:.75rem;max-width:38rem;margin-block:1rem}
+ .portal label {display:grid;gap:.3rem}
+ .portal input,.portal textarea,.portal select {width:100%;padding:.6rem;border:1px solid #6c7884;border-radius:.35rem;font:inherit}
+ .portal table {width:100%;border-collapse:collapse;text-align:start}
+ .portal th,.portal td {text-align:start;padding:.6rem;border-bottom:1px solid #ccd3db;vertical-align:top}
+ .portal td {overflow-wrap:anywhere}
+ .portal details {margin-block:.6rem}
+ .portal summary {cursor:pointer}
+ .portal-table {overflow:auto}
+ .portal article {min-width:0}
+ .portal button {justify-self:start}
+ .portal [aria-busy=true] {opacity:.75}
+ @media (min-width:850px) {
+  .portal-grid {display:grid;grid-template-columns:12rem minmax(0,1fr);gap:2rem;align-items:start}
+  .portal-links {flex-direction:column;align-items:flex-start;gap:.6rem;border-inline-end:1px solid #ccd3db;padding-inline-end:1rem}
+ }
+</style>
+<script>
+ const root=document.querySelector<HTMLElement>('[data-portal][data-init]');
+ if (root) {
+  import('../lib/portal').then(({mountPortal})=>mountPortal(root)).catch(()=>{
+   const {labels}=JSON.parse(root.dataset.init!);
+   const status=root.querySelector('[data-portal-status]');
+   if(status) status.textContent=labels.error;
+  });
+ }
+</script>

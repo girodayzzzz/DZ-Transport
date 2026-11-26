@@ -63,3 +63,11 @@ The favicon and wordmark are original temporary artwork. Photography is illustra
 The default build is a noindex preview with both submissions disabled. Start with [OWNER-CONFIGURATION.md](OWNER-CONFIGURATION.md), then follow [DEPLOYMENT.md](DEPLOYMENT.md). The [private management specification](docs/DZ-TRANSPORT-MANAGER.md) covers future intake, dispatch, reporting and CRM integration.
 
 The service cards and service headers use 420 px and 800 px WebP variants of the same licensed source images. The corresponding original JPEGs are used for social sharing. The existing DZ Transport wordmark remains provisional.
+
+## V3 portal and intake
+
+The static Astro preview retains the public site and disables live submissions and portal access. The staged V3 portal uses Supabase Auth and PostgreSQL row-level policies. The optional Cloudflare guest inquiry endpoint can replace the inquiry Formspree endpoint after hosted verification.
+
+- [Supabase setup](SUPABASE-SETUP.md) and [authentication](AUTHENTICATION.md)
+- [Database schema](DATABASE-SCHEMA.md) and [security testing](SECURITY-TESTING.md)
+- [Manager guide](ADMIN-GUIDE.md), [free-tier limits](FREE-TIER-LIMITS.md) and [backup and restore](BACKUP-AND-RESTORE.md)

@@ -2,6 +2,8 @@
 
 ## GitHub Pages review preview
 
+The legacy source setting runs a Jekyll workflow. Run 45881100243 failed on Astro front matter in `src/pages/404.astro`. The Astro verification on the same main commit passed in run 45881100027. GitHub denied integration writes to Pages settings and Actions variables, so a repository administrator needs to perform steps 2 and 3.
+
 1. Merge the reviewed pull request into `main`.
 2. In Settings → Pages → Build and deployment, select **GitHub Actions**.
 3. In Settings → Secrets and variables → Actions → Variables, set repository variable `PAGES_DEPLOY=true`.
@@ -11,6 +13,8 @@
 The workflow always builds in preview mode. GitHub Pages restricts using Pages to run an online business, e-commerce site or a site primarily directed at commercial transactions or commercial SaaS. Use it for review of the static implementation and use Cloudflare Pages for commercial production. [GitHub Pages usage limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits#prohibited-uses)
 
 ## Cloudflare Pages production
+
+The repo root contains an optional Pages Function at `functions/api/inquiry.js`. The committed `_routes.json` limits Function execution to `/api/inquiry`. Follow [Supabase setup](SUPABASE-SETUP.md) for private bindings, portal activation and the guest intake rollout.
 
 1. Complete [OWNER-CONFIGURATION.md](OWNER-CONFIGURATION.md) and the [launch checklist](LAUNCH-CHECKLIST.md).
 2. Create a Cloudflare Pages project connected to this repository. Select `main`, root directory `/`, build command `npm run build` and output directory `dist`. Set `NODE_VERSION=24`.

@@ -250,3 +250,21 @@ test('corridor direction and recurring business details use their localized inqu
  await btn(page,'Next').click();
  await expect(page.locator('[data-summary]')).not.toContainText('Monthly');
 });
+
+test('portal preview is unavailable and noindexed in all locales',async({page})=>{
+ await useFiles(page);
+ await page.setViewportSize({width:320,height:850});
+ for(const [suffix,language,title,message] of [
+  ['/prijava/','sl','Prijava','Portal še ni na voljo.'],
+  ['/en/login/','en','Sign in','The portal is currently unavailable.'],
+  ['/de/anmelden/','de','Anmelden','Das Portal ist derzeit nicht verfügbar.']
+ ]) {
+  await page.goto(path(suffix));
+  await expect(page.locator('html')).toHaveAttribute('lang',language);
+  await expect(page.getByRole('heading',{level:1,name:title})).toBeVisible();
+  await expect(page.getByText(message)).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content','noindex,follow');
+  await expect(page.locator('[data-portal][data-init]')).toHaveCount(0);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+ }
+});
