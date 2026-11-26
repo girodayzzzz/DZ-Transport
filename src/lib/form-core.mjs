@@ -31,9 +31,22 @@ export function endpoint(value) {
  if (!value) return '';
  try {
   const parsed = new URL(value);
-  if (parsed.protocol === 'https:' && !parsed.username && !parsed.password && !parsed.hash) return parsed.href;
+  if (parsed.protocol === 'https:' && !parsed.username && !parsed.password && !parsed.hash && !parsed.search) return parsed.href;
  } catch {}
  return '';
+}
+
+export function cargoTotals(items) {
+ return items.reduce((totals, item) => {
+  const {quantity, length, width, height, unitWeightKg, dimensionUnit} = item;
+  if (!['cm', 'm'].includes(dimensionUnit) || !Number.isSafeInteger(quantity) ||
+      ![quantity,length,width,height,unitWeightKg].every(value => Number.isFinite(value) && value > 0)) return totals;
+  const factor = dimensionUnit === 'm' ? 1 : 0.01;
+  return {
+   weightKg:totals.weightKg + quantity * unitWeightKg,
+   volumeM3:totals.volumeM3 + quantity * (length * factor) * (width * factor) * (height * factor)
+  };
+ }, {weightKg:0, volumeM3:0});
 }
 
 export function payload(meta, sections, values) {
@@ -43,16 +56,32 @@ export function payload(meta, sections, values) {
   contact:sections.customer,pickup:sections.pickup,delivery:sections.delivery,
   cargo:{type:grouping[values.transportCategory],...sections.cargo},
   schedule:sections.schedule,
-  additionalRequirements:{manualAssessment:values.regulated === 'yes',comments:values.comments || '',...sections.permission}
+  additionalRequirements:{manualAssessment:values.regulated === 'yes' || values.oversized === 'yes' || values.transportCategory === 'machinery',comments:values.comments || '',...sections.permission}
  };
 }
 
-export async function submit(postTo, data, request = fetch) {
+export function emailDetails(data) {
+ const section = (name, fields) => name + '\n' + Object.entries(fields || {}).map(([key,value]) =>
+  key + ': ' + (typeof value === 'object' ? JSON.stringify(value) : String(value))
+ ).join('\n');
+ const header = section('Submission', {reference:data.reference, language:data.language, submittedAt:data.submittedAt});
+ const blocks = data.kind === 'partner'
+  ? [section('Partner application', data.application)]
+  : [section('Transport', {category:data.transportCategory, customerType:data.customerType}),
+     section('Customer', data.contact), section('Pickup address', data.pickup),
+     section('Delivery address', data.delivery), section('Cargo', data.cargo),
+     section('Schedule', data.schedule), section('Additional services and manual assessment', data.additionalRequirements)];
+ return [header, ...blocks, ...(data.permission ? [section('Permissions', data.permission)] : [])].join('\n\n');
+}
+
+export async function submit(postTo, data, request = fetch, timeout = 18000) {
  const response = await request(postTo,{
   method:'POST',credentials:'omit',redirect:'error',
   headers:{Accept:'application/json','Content-Type':'application/json'},
   body:JSON.stringify(data),
-  signal:AbortSignal.timeout(18000)
+  signal:AbortSignal.timeout(timeout)
  });
- return response.ok;
+ if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return false;
+ const receipt = await response.json();
+ return receipt?.ok === true && (!('reference' in receipt) || receipt.reference === data.reference);
 }

@@ -1,4 +1,6 @@
 ---
+import {isProduction} from '../lib/site-config.mjs';
+import {corridors} from '../lib/corridors';
 import settings from '../../config/site.json';
 import {intro,t,titles,faq,process,booking,serviceDetails} from '../lib/content';
 import {business,editorial} from '../lib/editorial';
@@ -11,6 +13,7 @@ import Forms from './Forms.astro';
 const {lang,page}=Astro.props as {lang:Lang,page:Page};
 const category:Partial<Record<Page,string>>={vehicle:'car',pallet:'pallet',cargo:'cargo',moving:'moving',express:'express',special:'machinery'};
 const selected=category[page];
+const corridor=corridors[page as keyof typeof corridors];
 const quote=t(lang,['Zahtevajte ponudbo','Request a Transport Quote','Transportangebot anfragen']);
 const legal=['privacy','terms','cookies'].includes(page);
 const sections=editorial[page as keyof typeof editorial] || [];
@@ -25,7 +28,9 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
      <h1>{t(lang,titles[page])}</h1><p>{t(lang,intro[page])}</p>
      {selected && <a class="button primary" href={url(lang,'inquiry')+'?transportCategory='+selected+(page==='express'?'&urgent=1':'')}>{quote}</a>}
     </div>
-    {selected && <img src={asset('images/'+page+'.jpg')} alt="" width="800" height="500"/>}
+    {selected && <img src={asset('images/'+page+'-800.webp')}
+      srcset={asset('images/'+page+'-420.webp')+' 420w, '+asset('images/'+page+'-800.webp')+' 800w'}
+      sizes="(max-width: 520px) 90vw, 550px" alt="" width="800" height="500"/>}
    </div>
   </section>
   <div class:list={['section wrap', !['services','business'].includes(page)&&'content-width']}>
@@ -33,16 +38,26 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
    {selected && <div class="prose"><h2>{t(lang,['Kaj vključiti v povpraševanje','What to include in your inquiry','Was Ihre Anfrage enthalten sollte'])}</h2>{serviceDetails[page].map(detail=><p>{t(lang,detail)}</p>)}<a class="more" href={url(lang,'services')}>{t(lang,['Vse storitve','All services','Alle Leistungen'])}</a></div>}
    {page==='inquiry' && <Forms {lang} kind="inquiry"/>}
    {page==='partners' && <><p class="prose lead">{t(lang,['Prijave obravnavamo individualno. Pred sodelovanjem preverimo zmogljivosti, zavarovanje in ustrezna dovoljenja.','We review applications individually and verify capacity, insurance and relevant licences before cooperating.','Wir prüfen jede Bewerbung einzeln sowie Kapazitäten, Versicherung und einschlägige Genehmigungen vor einer Zusammenarbeit.'])}</p><Forms {lang} kind="partner"/></>}
-   {page==='business' && <div class="business-grid"><div><h2>{t(lang,['Komu je namenjeno','Who we work with','Für wen wir Transporte koordinieren'])}</h2><ul class="reasons">{business.map(item=><li>{t(lang,item)}</li>)}</ul></div><article><h2>{t(lang,['Poslovno povpraševanje','Business inquiry','Geschäftliche Anfrage'])}</h2><p>{t(lang,['Za redne prevoze opišite pogostost, običajne relacije, količine in posebne zahteve.','For recurring shipments, describe frequency, typical routes, volumes and special requirements.','Nennen Sie bei regelmäßigen Sendungen Häufigkeit, typische Strecken, Mengen und besondere Anforderungen.'])}</p><a class="button primary" href={url(lang,'inquiry')+'?customerType=business'}>{t(lang,['Oddajte poslovno povpraševanje','Start a business inquiry','Geschäftliche Anfrage starten'])}</a></article></div>}
+   {page==='business' && <div class="business-grid"><div><h2>{t(lang,['Komu je namenjeno','Who we work with','Für wen wir Transporte koordinieren'])}</h2><ul class="reasons">{business.map(([heading,body])=><li><h3>{t(lang,heading)}</h3><p>{t(lang,body)}</p></li>)}</ul></div><article><h2>{t(lang,['Poslovno povpraševanje','Business inquiry','Geschäftliche Anfrage'])}</h2><p>{t(lang,['Za redne prevoze opišite pogostost, običajne relacije, količine in posebne zahteve.','For recurring shipments, describe frequency, typical routes, volumes and special requirements.','Nennen Sie bei regelmäßigen Sendungen Häufigkeit, typische Strecken, Mengen und besondere Anforderungen.'])}</p><div class="actions"><a class="button primary" href={url(lang,'inquiry')+'?customerType=business&businessPattern=once'}>{t(lang,['Enkratni prevoz','One-time shipment','Einmaliger Transport'])}</a><a class="button secondary" href={url(lang,'inquiry')+'?customerType=business&businessPattern=recurring'}>{t(lang,['Redni prevozi','Recurring shipments','Regelmäßige Transporte'])}</a></div></article></div>}
+   {corridor && <div class="prose">
+    <h2>{t(lang,['Podatki za ponudbo','Details for your quote','Angaben für Ihr Angebot'])}</h2>
+    <p>{t(lang,corridor.detail)}</p>
+    <div class="actions">
+     <a class="button primary" href={url(lang,'inquiry')+'?pickupCountry=SI&deliveryCountry='+corridor.country}>{t(lang,['Iz Slovenije','From Slovenia','Aus Slowenien'])}</a>
+     <a class="button secondary" href={url(lang,'inquiry')+'?deliveryCountry=SI&pickupCountry='+corridor.country}>{t(lang,['V Slovenijo','To Slovenia','Nach Slowenien'])}</a>
+    </div>
+   </div>}
    {page==='process' && <><ol class="process vertical">{process.map((step,index)=><li><span>{index+1}</span>{t(lang,step)}</li>)}</ol><p class="notice">{t(lang,booking)}</p><a class="button primary" href={url(lang,'inquiry')}>{quote}</a></>}
    {page==='faq' && <div class="faq">{faq.map(([question,answer])=><details><summary>{t(lang,question)}</summary><p>{t(lang,answer)}</p></details>)}</div>}
-   {legal && <p class="notice">{t(lang,['Osnutek za pregled upravljavca pred javno objavo.','Draft for operator review before public launch.','Entwurf zur Prüfung durch den Betreiber vor der Veröffentlichung.'])}</p>}
+   {legal && !isProduction && <p class="notice">{t(lang,['Osnutek za pregled upravljavca pred javno objavo.','Draft for operator review before public launch.','Entwurf zur Prüfung durch den Betreiber vor der Veröffentlichung.'])}</p>}
    {sections.length>0 && <div class="prose">{sections.map(([heading,body])=><section><h2>{t(lang,heading)}</h2><p>{t(lang,body)}</p></section>)}</div>}
    {(page==='privacy'||page==='terms'||page==='contact') && <div class="prose">
     <h2>{t(lang,['Podatki upravljavca','Operator details','Betreiberangaben'])}</h2>
     {settings.operator ? <p>{settings.operator}<br/>{settings.address}<br/>{settings.registration}<br/>{settings.vat}</p> : <p>{t(lang,['Podatki bodo dodani pred objavo.','Details will be added before launch.','Die Angaben werden vor der Veröffentlichung ergänzt.'])}</p>}
     {settings.email && <p><a href={'mailto:'+settings.email}>{settings.email}</a></p>}{settings.telephone&&<p><a href={'tel:'+settings.telephone.replace(/\s/g,'')}>{settings.telephone}</a></p>}
-    {page==='privacy' && <p>{t(lang,['Ponudnik obrazcev','Form provider','Formulardienst'])} · {settings.privacy.provider}. {settings.privacy.retention || t(lang,['Rok hrambe bo določen pred objavo.','The retention period will be specified before launch.','Die Speicherdauer wird vor Veröffentlichung ergänzt.'])}</p>}
+    {page==='contact' && settings.businessHours && <p>{settings.businessHours}</p>}
+    {page==='terms' && settings.legal.contractualRole && <p>{settings.legal.contractualRole}</p>}
+    {page==='privacy' && settings.privacy.provider && <p>{t(lang,['Ponudnik obrazcev','Form provider','Formulardienst'])} · {settings.privacy.provider}. {settings.privacy.retention || t(lang,['Rok hrambe bo določen pred objavo.','The retention period will be specified before launch.','Die Speicherdauer wird vor Veröffentlichung ergänzt.'])}</p>}
    </div>}
    {page==='about' && <a class="more" href={settings.parentUrl}>DZ Auto Trade</a>}
    {page==='contact' && <a class="button primary" href={url(lang,'inquiry')}>{quote}</a>}

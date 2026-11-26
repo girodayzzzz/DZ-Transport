@@ -1,6 +1,11 @@
+import {corridors} from './corridors';
 import { localized, type Lang, type Page } from './routes';
 
 export const titles: Record<Page,string[]> = {
+ germany:corridors.germany.title,
+ austria:corridors.austria.title,
+ italy:corridors.italy.title,
+ croatia:corridors.croatia.title,
  home:['Organizacija prevozov po Sloveniji in Evropi','Transport coordination across Slovenia and Europe','Transportkoordination in Slowenien und Europa'],
  services:['Prevozne storitve','Transport services','Transportleistungen'],
  vehicle:['Prevoz vozil','Vehicle transport','Fahrzeugtransport'],
@@ -24,7 +29,11 @@ export const titles: Record<Page,string[]> = {
 };
 
 export const intro: Record<Page,string[]> = {
- home:['Zanesljive možnosti prevoza po Sloveniji in Evropi. Oddajte povpraševanje in prejmite individualno ponudbo po svojih potrebah.','Reliable transport solutions across Slovenia and Europe. Submit your transport inquiry and receive an individual offer tailored to your requirements.','Zuverlässige Transportlösungen in Slowenien und Europa. Senden Sie uns Ihre Anfrage und erhalten Sie ein individuelles Angebot für Ihren Bedarf.'],
+ germany:corridors.germany.intro,
+ austria:corridors.austria.intro,
+ italy:corridors.italy.intro,
+ croatia:corridors.croatia.intro,
+ home:['DZ Transport je del DZ Auto Trade in usklajuje prevoz vozil in tovora z ustreznimi izvajalci po Sloveniji in Evropi.','DZ Transport, part of DZ Auto Trade, coordinates vehicle and cargo transport through suitable providers across Slovenia and Europe.','DZ Transport gehört zu DZ Auto Trade und koordiniert Fahrzeug- und Warentransporte mit geeigneten Anbietern in Slowenien und Europa.'],
  services:['Izberite vrsto prevoza in nam sporočite, kaj želite prepeljati.','Choose a service and tell us what you need to move.','Wählen Sie eine Leistung und teilen Sie uns mit, was Sie transportieren möchten.'],
  vehicle:['Organizacija prevoza avtomobilov, motornih koles in dostavnikov po Sloveniji in Evropi.','Coordinate transport for cars, motorcycles and vans across Slovenia and Europe.','Organisation von Transporten für Pkw, Motorräder und Transporter in Slowenien und Europa.'],
  pallet:['Prevoz posameznih palet in večjih paletnih pošiljk po Sloveniji in Evropi.','Arrange transport for single pallets and larger palletised shipments in Slovenia and across Europe.','Palettentransport für einzelne Paletten und größere Sendungen in Slowenien und Europa.'],

@@ -1,4 +1,5 @@
 export const copy = {
+ nonRunning:['Za to vrsto prevoza označite, da vozilo ni vozno.','For this category, mark the vehicle as non-running.','Geben Sie für diese Kategorie an, dass das Fahrzeug nicht fahrbereit ist.'],
  yes:['Da','Yes','Ja'],
  no:['Ne','No','Nein'],
  choose:['Izberite','Select an option','Bitte auswählen'],
@@ -18,7 +19,7 @@ export const copy = {
  deliveryPast:['Datum dostave ne sme biti v preteklosti.','The delivery date cannot be in the past.','Das Lieferdatum darf nicht in der Vergangenheit liegen.'],
  order:['Datum dostave mora biti na dan prevzema ali pozneje.','Delivery must be on or after pickup.','Die Lieferung muss am Abholtag oder später erfolgen.'],
  datesRequired:['Vnesite vsaj en datum ali označite prilagodljive datume.','Enter at least one date or select flexible dates.','Geben Sie mindestens ein Datum an oder wählen Sie flexible Termine.'],
- manual:['Nevaren ali reguliran tovor bomo obravnavali individualno. Oddaja ne pomeni, da je prevoz mogoč.','Hazardous or regulated cargo requires individual assessment. Submission does not establish availability.','Gefährliche oder regulierte Güter erfordern eine Einzelfallprüfung. Die Anfrage bestätigt keine Verfügbarkeit.'],
+ manual:['Stroje, izredne in regulirane pošiljke ter nevaren tovor bomo obravnavali individualno. Oddaja ne pomeni, da je prevoz mogoč.','Machinery, oversized, overweight, hazardous and regulated cargo require individual assessment. Submission does not establish availability.','Maschinen, Sonderladungen und gefährliche oder regulierte Güter erfordern eine Einzelfallprüfung. Die Anfrage bestätigt keine Verfügbarkeit.'],
  step:['Korak','Step','Schritt'],
  of:['od','of','von'],
  edit:['Uredi','Edit','Bearbeiten'],

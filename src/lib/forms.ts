@@ -1,5 +1,5 @@
 import { grouping } from './form-schema.mjs';
-import { localDate, scheduleError, phoneValid, reference, payload, submit } from './form-core.mjs';
+import { cargoTotals, localDate, scheduleError, phoneValid, reference, payload, emailDetails, submit } from './form-core.mjs';
 
 type Control = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 const controls = (root:ParentNode) => [...root.querySelectorAll<Control>('input:not(:disabled),select:not(:disabled),textarea:not(:disabled)')];
@@ -27,18 +27,78 @@ function initialize(form:HTMLFormElement) {
  const query = new URLSearchParams(location.search);
  const markers = [...form.querySelectorAll('[data-marker]')];
 
+ function batchItems(panel:Element) {
+  return [...panel.querySelectorAll<HTMLFieldSetElement>('.cargo-item')].map(item =>
+   Object.fromEntries(controls(item).map(input=>[
+    input.name, input instanceof HTMLInputElement && input.type==='number' ? input.valueAsNumber : input.value
+   ]))
+  );
+ }
+
+ const numberFormat=new Intl.NumberFormat(document.documentElement.lang,{maximumFractionDigits:6});
+ function updateTotals() {
+  for (const panel of form.querySelectorAll<HTMLElement>('[data-cargo]:not([disabled])')) {
+   const weight=panel.querySelector('[data-weight]');
+   if (!weight) continue;
+   const totals=cargoTotals(batchItems(panel));
+   weight.textContent=numberFormat.format(totals.weightKg);
+   get(panel,'[data-volume]').textContent=numberFormat.format(totals.volumeM3);
+  }
+ }
+
+ for (const list of form.querySelectorAll<HTMLElement>('[data-items]')) {
+  const parent=list.parentElement!;
+  const add=get<HTMLButtonElement>(parent,'[data-add]');
+  const template=get<HTMLTemplateElement>(parent,'template');
+  let sequence=0;
+  function updateButtons() {
+   add.disabled=list.children.length>=20;
+   for (const button of list.querySelectorAll<HTMLButtonElement>('[data-remove]')) button.disabled=list.children.length===1;
+  }
+  function append(focus:boolean) {
+   const row=template.content.firstElementChild!.cloneNode(true) as HTMLFieldSetElement;
+   const suffix='-'+(++sequence);
+   for (const element of row.querySelectorAll('[id]')) {
+    element.id=element.id.endsWith('-error')
+     ? element.id.slice(0,-6)+suffix+'-error'
+     : element.id+suffix;
+   }
+   for (const label of row.querySelectorAll('label')) label.htmlFor+=suffix;
+   get(row,'[data-remove]').addEventListener('click',()=>{
+    row.remove();
+    updateButtons();
+    updateTotals();
+    add.focus();
+   });
+   list.append(row);
+   updateButtons();
+   if (focus) row.querySelector('input')?.focus();
+  }
+  append(false);
+  add.addEventListener('click',()=>append(true));
+ }
+
  if (kind === 'inquiry') {
   for (const key of ['transportCategory','pickupCountry','deliveryCountry','customerType']) {
    const input = form.elements.namedItem(key) as HTMLSelectElement;
    const initial = query.get(key);
    if (initial && [...input.options].some(option=>option.value===initial)) input.value=initial;
   }
+  let places: Record<string,string> = {};
+  try {
+   const stored=sessionStorage.getItem('dzt-quick-route');
+   sessionStorage.removeItem('dzt-quick-route');
+   if (query.has('quick') && stored) places=JSON.parse(stored);
+  } catch {}
   for (const place of ['pickup','delivery']) {
-   const initial = query.get(place+'Place')?.trim().slice(0,120);
+   const value=places?.[place+'Place'];
+   const initial = typeof value==='string' ? value.trim().slice(0,120) : '';
    if (!initial) continue;
    const suffix = /^\d[\d -]*$|^[A-Z]{1,3}\d[A-Z\d]*[ -]?[A-Z\d]+$/i.test(initial) ? 'Postal' : 'City';
    (form.elements.namedItem(place+suffix) as HTMLInputElement).value=initial;
   }
+  const pattern=query.get('businessPattern');
+  if (pattern==='once' || pattern==='recurring') (form.elements.namedItem('businessPattern') as HTMLSelectElement).value=pattern;
   if (query.has('urgent') && values().transportCategory === 'express') (form.elements.namedItem('urgent') as HTMLInputElement).checked=true;
   next!.disabled=false;
  }
@@ -53,8 +113,11 @@ function initialize(form:HTMLFormElement) {
    panel.hidden=!enabled;
    panel.disabled=!enabled;
   }
+  const recurring=form.querySelector<HTMLFieldSetElement>('[data-recurring]');
+  if (recurring) recurring.hidden=recurring.disabled=current.customerType!=='business' || current.businessPattern!=='recurring';
+  updateTotals();
   const flag = form.querySelector<HTMLElement>('[data-regulated]');
-  if (flag) flag.hidden=current.regulated!=='yes';
+  if (flag) flag.hidden=current.regulated!=='yes' && current.oversized!=='yes' && current.transportCategory!=='machinery';
   for (const date of form.querySelectorAll<HTMLInputElement>('input[type=date]')) date.min=localDate();
  }
 
@@ -80,9 +143,10 @@ function initialize(form:HTMLFormElement) {
   for (const input of entries) {
    let message='';
    if (input.name===dateField && dateIssue) message=strings[dateIssue];
-   else if (input.validity.valueMissing || (input.required && typeof current[input.name]==='string' && !current[input.name])) message=strings.required;
+   else if (input.validity.valueMissing || (input.required && input.type!=='checkbox' && !input.value.trim())) message=strings.required;
    else if (input.validity.typeMismatch && input.type==='email') message=strings.email;
    else if (input.name==='phone' && !phoneValid(String(current.phone))) message=strings.phone;
+   else if (input.name==='running' && current.transportCategory==='nonRunning' && input.value==='yes') message=strings.nonRunning;
    else if (!input.validity.valid) message=strings.invalid;
    setError(input,message);
    if (message && !first) first=input;
@@ -90,11 +154,16 @@ function initialize(form:HTMLFormElement) {
   return first;
  }
 
- function sections(): Record<string,Record<string,string|boolean>> {
-  const current=values();
-  return Object.fromEntries([...form.querySelectorAll<HTMLElement>('[data-group]')].map(group=>[
-   group.dataset.group!,Object.fromEntries(controls(group).map(input=>[input.name,current[input.name]]))
+ function sections() {
+  const grouped=Object.fromEntries([...form.querySelectorAll<HTMLElement>('[data-group]')].map(group=>[
+   group.dataset.group!,Object.fromEntries(controls(group).filter(input=>!input.closest('.cargo-item')).map(input=>[
+    input.name,input instanceof HTMLInputElement && input.type==='checkbox' ? input.checked : input.value.trim()
+   ]))
   ]));
+  const panel=form.querySelector('[data-cargo]:not([disabled]) [data-items]')?.parentElement;
+  if (!panel) return grouped;
+  const items=batchItems(panel);
+  return {...grouped,cargo:{...grouped.cargo,items,...cargoTotals(items)}};
  }
 
  function summary() {
@@ -121,7 +190,7 @@ function initialize(form:HTMLFormElement) {
      block.append(sub);
     }
     const list=document.createElement('dl');
-    for (const input of controls(group)) {
+    for (const input of controls(group).filter(input=>!input.closest('.cargo-item'))) {
      const term=document.createElement('dt');
      const definition=document.createElement('dd');
      term.textContent=input.labels?.[0]?.textContent?.trim() || input.name;
@@ -133,6 +202,20 @@ function initialize(form:HTMLFormElement) {
      list.append(term,definition);
     }
     block.append(list);
+    const items=group.querySelector('[data-cargo]:not([disabled]) .cargo-items');
+    if (items) {
+     const metrics=items.querySelector('.cargo-totals');
+     for (const row of items.querySelectorAll('.cargo-item')) {
+      const details=document.createElement('p');
+      details.textContent=controls(row).map(input=>{
+       const label=input.labels?.[0]?.textContent?.trim() || input.name;
+       const value=input instanceof HTMLSelectElement ? input.selectedOptions[0]?.textContent : input.value;
+       return label+' · '+value;
+      }).join(' / ');
+      block.append(details);
+     }
+     if (metrics) block.append(metrics.cloneNode(true));
+    }
    }
    container.append(block);
   });
@@ -158,6 +241,7 @@ function initialize(form:HTMLFormElement) {
  form.addEventListener('change',refresh);
  form.addEventListener('input',event=>{
   const field=event.target as Control;
+  updateTotals();
   if (field.hasAttribute('aria-invalid')) setError(field,'');
  });
  previous?.addEventListener('click',()=>show(active-1));
@@ -197,8 +281,7 @@ function initialize(form:HTMLFormElement) {
    meta={kind,reference:reference(),submittedAt:new Date().toISOString(),language:document.documentElement.lang};
   }
   const data=payload(meta,grouped,current);
-  const details=Object.entries(grouped).map(([key,fields])=>key.toUpperCase()+'\n'+
-   Object.entries(fields).map(([field,value])=>field+': '+String(value)).join('\n')).join('\n\n');
+  const details=emailDetails(data);
   working=true;
   send.disabled=true;
   if (previous) previous.disabled=true;
@@ -231,6 +314,9 @@ function initialize(form:HTMLFormElement) {
    send.textContent=label;
    if (!finished) {
     for (const control of locked) control.disabled=false;
+    refresh();
+    error.tabIndex=-1;
+    error.focus();
     send.disabled=false;
     if (previous) previous.disabled=false;
    }

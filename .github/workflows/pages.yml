@@ -14,6 +14,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
+      DZ_SITE_MODE: preview
       ASTRO_TELEMETRY_DISABLED: '1'
       SITE_URL: ${{ vars.WEBSITE_URL || format('https://{0}.github.io', github.repository_owner) }}
       BASE_PATH: ${{ vars.WEBSITE_BASE_PATH || format('/{0}', github.event.repository.name) }}

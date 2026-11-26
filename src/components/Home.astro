@@ -1,4 +1,5 @@
 ---
+import {corridors} from '../lib/corridors';
 import {intro, titles,t,process,reasons,coverage} from '../lib/content';
 import {asset,url} from '../lib/routes';
 import {transport,location} from '../lib/form-schema.mjs';
@@ -15,7 +16,7 @@ const places=['pickup','delivery'].map(key=>[
  <picture><source media="(max-width:640px)" srcset={asset('images/road-mobile.webp')}/><img src={asset('images/road.webp')} alt={t(lang,['Tovornjak na cesti','Freight truck on the road','Lastwagen auf der Straße'])} fetchpriority="high" width="1900" height="1267"/></picture>
  <div class="wrap hero-inner">
   <p class="eyebrow"><span></span>{t(lang,['Organizacija prevozov · Slovenija in Evropa','Transport coordination · Slovenia and Europe','Transportkoordination · Slowenien und Europa'])}</p>
-  <h1>{t(lang,['Vaš tovor.','Your Cargo.','Ihre Ladung.'])}<br/><em>{t(lang,['Naša organizacija.','Our Coordination.','Unsere Koordination.'])}</em></h1>
+  <h1>{t(lang,['Prevozi po Sloveniji','Transport across Slovenia','Transporte in Slowenien'])}<br/><em>{t(lang,['in Evropi','and Europe','und Europa'])}</em></h1>
   <p class="hero-desc">{t(lang,intro.home)}</p>
   <div class="actions"><a class="button primary" href={url(lang,'inquiry')}>{quote}</a><a class="button light" href={url(lang,'services')}>{t(lang,['Raziščite storitve','Explore Services','Leistungen entdecken'])}</a></div>
  </div>
@@ -26,13 +27,14 @@ const places=['pickup','delivery'].map(key=>[
   <form action={url(lang,'inquiry')} method="get" data-quick novalidate>
    <Field field={transport} {lang} prefix="quick-"/>
    {places.flat().map(field=><Field {field} {lang} prefix="quick-"/>)}
-   <button type="submit" class="button primary">{t(lang,['Nadaljujte','Continue','Weiter'])}</button>
+   <button type="submit" class="button primary" data-quick-submit disabled>{t(lang,['Nadaljujte','Continue','Weiter'])}</button>
    <p class="quick-error" data-quick-error role="alert" hidden>{t(lang,['Izpolnite vsa polja.','Complete all fields.','Füllen Sie alle Felder aus.'])}</p>
   </form>
  </section>
 </div>
 <section class="section wrap">
  <div class="section-title"><h2>{t(lang,titles.services)}</h2><p>{t(lang,intro.services)}</p></div>
+ <div class="market-grid"><article><h3>{t(lang,['Domači prevozi','Domestic transport','Inlandstransporte'])}</h3><p>{t(lang,['Za prevoz po Sloveniji navedite kraj prevzema in dostave ter dostop za nakladanje.','For shipments within Slovenia, include pickup and delivery towns and loading access.','Für Transporte innerhalb Sloweniens nennen Sie Abhol- und Zielort sowie den Ladezugang.'])}</p></article><article><h3>{t(lang,['Mednarodni prevozi','International transport','Internationale Transporte'])}</h3><p>{t(lang,['Za prevoz čez mejo navedite obe državi, rok dostave in morebitne zahteve za predajo.','For cross-border shipments, give both countries, the delivery window and any handover requirements.','Bei grenzüberschreitenden Sendungen nennen Sie beide Länder, das Lieferzeitfenster und die Übergabeanforderungen.'])}</p></article></div>
  <Cards {lang}/>
 </section>
 <section class="section muted">
@@ -41,22 +43,37 @@ const places=['pickup','delivery'].map(key=>[
 </section>
 <section class="coverage">
  <div class="wrap split">
-  <div><p class="eyebrow"><span></span>{t(lang,['OBMOČJE PREVOZOV','TRANSPORT COVERAGE','TRANSPORTGEBIET'])}</p><h2>{t(lang,['Iz Slovenije po Evropi','From Slovenia across Europe','Von Slowenien durch Europa'])}</h2><p>{t(lang,coverage)}</p><a class="button primary" href={url(lang,'inquiry')}>{quote}</a></div>
+  <div><p class="eyebrow"><span></span>{t(lang,['OBMOČJE PREVOZOV','TRANSPORT COVERAGE','TRANSPORTGEBIET'])}</p><h2>{t(lang,['Iz Slovenije po Evropi','From Slovenia across Europe','Von Slowenien durch Europa'])}</h2><p>{t(lang,coverage)}</p><ul class="corridor-links">{Object.entries(corridors).map(([key,route])=><li><a href={url(lang,key as keyof typeof corridors)}>{t(lang,route.title)}</a></li>)}</ul><a class="button primary" href={url(lang,'inquiry')}>{quote}</a></div>
   <div class="coverage-art" aria-hidden="true"><img src={asset('images/europe.webp')} loading="lazy" alt="" width="650" height="400"/></div>
  </div>
 </section>
 <section class="section wrap"><h2>{t(lang,['Zakaj DZ Transport','Why DZ Transport','Warum DZ Transport'])}</h2><ul class="reasons">{reasons.map(item=><li>{t(lang,item)}</li>)}</ul></section>
 <section class="section muted">
- <div class="wrap audiences">{(['business','partners'] as const).map(item=><article><h2>{t(lang,titles[item])}</h2><p>{t(lang,intro[item])}</p><a class="more" href={url(lang,item)}>{t(lang,item==='business'?['Rešitve za podjetja','Business transport solutions','Transportlösungen für Unternehmen']:['Prijava za sodelovanje','Apply for cooperation','Für Zusammenarbeit bewerben'])}</a></article>)}</div>
+ <div class="wrap audiences"><article><h2>{t(lang,['Za zasebne stranke','Private customers','Privatkunden'])}</h2><p>{t(lang,['Uskladimo prevoz kupljenega vozila, dostavo pohištva ali selitev.','Arrange transport for a vehicle purchase, furniture delivery or household move.','Organisieren Sie den Transport eines gekauften Fahrzeugs, eine Möbellieferung oder einen Umzug.'])}</p><a class="more" href={url(lang,'inquiry')+'?customerType=private'}>{quote}</a></article>{(['business','partners'] as const).map(item=><article><h2>{t(lang,titles[item])}</h2><p>{t(lang,intro[item])}</p><a class="more" href={url(lang,item)}>{t(lang,item==='business'?['Rešitve za podjetja','Business transport solutions','Transportlösungen für Unternehmen']:['Prijava za sodelovanje','Apply for cooperation','Für Zusammenarbeit bewerben'])}</a></article>)}</div>
 </section>
 <section class="final-cta"><div class="wrap"><h2>{t(lang,['Potrebujete prevoz?','Need to arrange transport?','Sie benötigen einen Transport?'])}</h2><a class="button primary" href={url(lang,'inquiry')}>{quote}</a></div></section>
 <script>
  const form=document.querySelector<HTMLFormElement>('[data-quick]');
+ const button=form?.querySelector<HTMLButtonElement>('[data-quick-submit]');
+ if (button) button.disabled=false;
  form?.addEventListener('submit',event=>{
+  event.preventDefault();
   const inputs=[...form.querySelectorAll<HTMLInputElement|HTMLSelectElement>('input,select')];
   const invalid=inputs.find(input=>!input.value.trim());
-  if (!invalid) return;
-  event.preventDefault();
+  if (!invalid) {
+   const target=new URL(form.action);
+   const places:Record<string,string>={};
+   for (const input of inputs) {
+    if (input.name.endsWith('Place')) places[input.name]=input.value.trim();
+    else target.searchParams.set(input.name,input.value);
+   }
+   try {
+    sessionStorage.setItem('dzt-quick-route',JSON.stringify(places));
+    target.searchParams.set('quick','1');
+   } catch {}
+   location.assign(target.href);
+   return;
+  }
   form.querySelector<HTMLElement>('[data-quick-error]')!.hidden=false;
   for (const input of inputs) {
    if (!input.value.trim()) input.setAttribute('aria-invalid','true');

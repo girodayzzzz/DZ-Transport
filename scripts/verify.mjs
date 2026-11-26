@@ -28,8 +28,11 @@ for (const file of files) {
   assert.equal([...html.matchAll(/hreflang="[^"]+" href="https:\/\//g)].length,config.languages.length+1,file);
   count[lang]++;
  } else assert.match(html,/noindex,follow/);
- for(const match of html.matchAll(/\b(?:href|src|srcset|action)="([^"]*)"/g)){
-  const value=match[1].replaceAll('&amp;','&');
+ const links=[...html.matchAll(/\b(href|src|srcset|action)="([^"]*)"/g)].flatMap(([,attribute,value])=>
+  attribute==='srcset' ? value.split(',').map(entry=>entry.trim().split(/\s+/)[0]) : [value]
+ );
+ for(const link of links){
+  const value=link.replaceAll('&amp;','&');
   if(value.startsWith('#')) {
    assert.ok(ids.get(file).has(value.slice(1)),file+' broken fragment '+value);
    continue;
@@ -44,8 +47,9 @@ for (const file of files) {
  }
  for(const match of html.matchAll(/<label for="([^"]+)"/g)) assert.ok(ids.get(file).has(match[1]),file+' missing label target');
 }
-for(const language of config.languages) assert.equal(count[language],18,language+' indexable routes');
+const indexable = process.env.DZ_SITE_MODE === 'production' ? 19 : 0;
+for(const language of config.languages) assert.equal(count[language],indexable,language+' indexable routes');
 const sitemap=readFileSync(join(dir,'sitemap.xml'),'utf8');
-assert.equal([...sitemap.matchAll(/<loc>/g)].length,18*config.languages.length);
-assert.ok(readFileSync(join(dir,'robots.txt'),'utf8').includes(origin+base+'/sitemap.xml'));
+assert.equal([...sitemap.matchAll(/<loc>/g)].length,indexable*config.languages.length);
+assert.equal(readFileSync(join(dir,'robots.txt'),'utf8').includes(origin+base+'/sitemap.xml'), Boolean(indexable));
 console.log('Verified '+files.length+' HTML routes, sitemap, robots, canonical URLs, assets, labels, and internal links.');
