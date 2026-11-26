@@ -1,0 +1,68 @@
+---
+import settings from '../../config/site.json';
+import {intro,t,titles,faq,process,booking,serviceDetails} from '../lib/content';
+import {business,editorial} from '../lib/editorial';
+import {copy} from '../lib/form-copy';
+import {asset,url,type Page,type Lang} from '../lib/routes';
+import Layout from './Layout.astro';
+import Home from './Home.astro';
+import Cards from './Cards.astro';
+import Forms from './Forms.astro';
+const {lang,page}=Astro.props as {lang:Lang,page:Page};
+const category:Partial<Record<Page,string>>={vehicle:'car',pallet:'pallet',cargo:'cargo',moving:'moving',express:'express',special:'machinery'};
+const selected=category[page];
+const quote=t(lang,['Zahtevajte ponudbo','Request a Transport Quote','Transportangebot anfragen']);
+const legal=['privacy','terms','cookies'].includes(page);
+const sections=editorial[page as keyof typeof editorial] || [];
+const confirmation=Object.fromEntries(['received','partnerReceived','reference','referenceNote'].map(key=>[key,t(lang,copy[key as keyof typeof copy])]));
+---
+<Layout {lang} {page}>
+ {page==='home' ? <Home {lang}/> : <>
+  <section class:list={['page-hero',selected&&'with-photo']}>
+   <div class="wrap">
+    <div>
+     <p class="eyebrow"><span></span>{page==='missing'?'404':selected?t(lang,titles.services):'DZ TRANSPORT'}</p>
+     <h1>{t(lang,titles[page])}</h1><p>{t(lang,intro[page])}</p>
+     {selected && <a class="button primary" href={url(lang,'inquiry')+'?transportCategory='+selected+(page==='express'?'&urgent=1':'')}>{quote}</a>}
+    </div>
+    {selected && <img src={asset('images/'+page+'.jpg')} alt="" width="800" height="500"/>}
+   </div>
+  </section>
+  <div class:list={['section wrap', !['services','business'].includes(page)&&'content-width']}>
+   {page==='services' && <><h2 class="sr-only">{t(lang,titles.services)}</h2><Cards {lang}/></>}
+   {selected && <div class="prose"><h2>{t(lang,['Kaj vključiti v povpraševanje','What to include in your inquiry','Was Ihre Anfrage enthalten sollte'])}</h2>{serviceDetails[page].map(detail=><p>{t(lang,detail)}</p>)}<a class="more" href={url(lang,'services')}>{t(lang,['Vse storitve','All services','Alle Leistungen'])}</a></div>}
+   {page==='inquiry' && <Forms {lang} kind="inquiry"/>}
+   {page==='partners' && <><p class="prose lead">{t(lang,['Prijave obravnavamo individualno. Pred sodelovanjem preverimo zmogljivosti, zavarovanje in ustrezna dovoljenja.','We review applications individually and verify capacity, insurance and relevant licences before cooperating.','Wir prüfen jede Bewerbung einzeln sowie Kapazitäten, Versicherung und einschlägige Genehmigungen vor einer Zusammenarbeit.'])}</p><Forms {lang} kind="partner"/></>}
+   {page==='business' && <div class="business-grid"><div><h2>{t(lang,['Komu je namenjeno','Who we work with','Für wen wir Transporte koordinieren'])}</h2><ul class="reasons">{business.map(item=><li>{t(lang,item)}</li>)}</ul></div><article><h2>{t(lang,['Poslovno povpraševanje','Business inquiry','Geschäftliche Anfrage'])}</h2><p>{t(lang,['Za redne prevoze opišite pogostost, običajne relacije, količine in posebne zahteve.','For recurring shipments, describe frequency, typical routes, volumes and special requirements.','Nennen Sie bei regelmäßigen Sendungen Häufigkeit, typische Strecken, Mengen und besondere Anforderungen.'])}</p><a class="button primary" href={url(lang,'inquiry')+'?customerType=business'}>{t(lang,['Oddajte poslovno povpraševanje','Start a business inquiry','Geschäftliche Anfrage starten'])}</a></article></div>}
+   {page==='process' && <><ol class="process vertical">{process.map((step,index)=><li><span>{index+1}</span>{t(lang,step)}</li>)}</ol><p class="notice">{t(lang,booking)}</p><a class="button primary" href={url(lang,'inquiry')}>{quote}</a></>}
+   {page==='faq' && <div class="faq">{faq.map(([question,answer])=><details><summary>{t(lang,question)}</summary><p>{t(lang,answer)}</p></details>)}</div>}
+   {legal && <p class="notice">{t(lang,['Osnutek za pregled upravljavca pred javno objavo.','Draft for operator review before public launch.','Entwurf zur Prüfung durch den Betreiber vor der Veröffentlichung.'])}</p>}
+   {sections.length>0 && <div class="prose">{sections.map(([heading,body])=><section><h2>{t(lang,heading)}</h2><p>{t(lang,body)}</p></section>)}</div>}
+   {(page==='privacy'||page==='terms'||page==='contact') && <div class="prose">
+    <h2>{t(lang,['Podatki upravljavca','Operator details','Betreiberangaben'])}</h2>
+    {settings.operator ? <p>{settings.operator}<br/>{settings.address}<br/>{settings.registration}<br/>{settings.vat}</p> : <p>{t(lang,['Podatki bodo dodani pred objavo.','Details will be added before launch.','Die Angaben werden vor der Veröffentlichung ergänzt.'])}</p>}
+    {settings.email && <p><a href={'mailto:'+settings.email}>{settings.email}</a></p>}{settings.telephone&&<p><a href={'tel:'+settings.telephone.replace(/\s/g,'')}>{settings.telephone}</a></p>}
+    {page==='privacy' && <p>{t(lang,['Ponudnik obrazcev','Form provider','Formulardienst'])} · {settings.privacy.provider}. {settings.privacy.retention || t(lang,['Rok hrambe bo določen pred objavo.','The retention period will be specified before launch.','Die Speicherdauer wird vor Veröffentlichung ergänzt.'])}</p>}
+   </div>}
+   {page==='about' && <a class="more" href={settings.parentUrl}>DZ Auto Trade</a>}
+   {page==='contact' && <a class="button primary" href={url(lang,'inquiry')}>{quote}</a>}
+   {page==='confirmation' && <div data-confirmation-copy={JSON.stringify(confirmation)} hidden class="notice" role="status"><h2></h2><p data-reference></p><p>{confirmation.referenceNote}</p></div>}
+   {(page==='missing'||page==='confirmation') && <a class="button primary" href={url(lang,'home')}>{t(lang,['Nazaj na začetno stran','Back to the home page','Zurück zur Startseite'])}</a>}
+  </div>
+ </>}
+</Layout>
+<script>
+ const panel=document.querySelector<HTMLElement>('[data-confirmation-copy]');
+ if (panel) {
+  try {
+   const entry=JSON.parse(sessionStorage.getItem('dzt-confirmation')||'null');
+   sessionStorage.removeItem('dzt-confirmation');
+   if (entry && /^DZT-\d{8}-[A-Z0-9]{6}$/.test(entry.reference)) {
+    const copy=JSON.parse(panel.dataset.confirmationCopy!);
+    panel.querySelector('h2')!.textContent=entry.kind==='partner'?copy.partnerReceived:copy.received;
+    panel.querySelector('[data-reference]')!.textContent=copy.reference+' · '+entry.reference;
+    panel.hidden=false;
+   }
+  } catch {}
+ }
+</script>

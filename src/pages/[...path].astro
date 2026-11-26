@@ -1,0 +1,11 @@
+---
+import Page from '../components/Page.astro';
+import {pages,slugs,defaultLanguage,enabledLanguages,position} from '../lib/routes';
+export function getStaticPaths() {
+ return enabledLanguages.flatMap(lang=>pages.filter(page=>!(lang===defaultLanguage&&page==='missing')).map(page=>({
+  params:{path:[lang===defaultLanguage?'':lang,slugs[page][position(lang)]].filter(Boolean).join('/') || undefined},
+  props:{lang,page}
+ })));
+}
+---
+<Page {...Astro.props}/>

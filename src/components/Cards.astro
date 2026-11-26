@@ -1,0 +1,24 @@
+---
+import { intro,t,titles } from '../lib/content';
+import {asset,services,url} from '../lib/routes';
+const {lang} = Astro.props;
+const icons=[
+ 'M3 13l2-5h14l2 5v5H3zm2 5v2m14-2v2M3 13h18m-14 2h2m6 0h2',
+ 'M3 18h18v3H3zm2 0V8h6v10m2 0V4h6v14M5 12h6m2-3h6',
+ 'M3 7l9-4 9 4v10l-9 4-9-4zm0 0l9 4 9-4m-9 4v10m-5-16l9 4',
+ 'M3 11l9-8 9 8m-16-1v11h14V10m-10 11v-7h6v7',
+ 'M13 2L4 14h7l-1 8 10-12h-7z',
+ 'M4 21V8h16v13M3 8l9-5 9 5m-9 0v7a2 2 0 104 0'
+];
+---
+<div class="service-grid">
+ {services.map((item,index)=><article class="service-card">
+  <a href={url(lang,item)}>
+   <div class="service-photo"><img src={asset('images/'+item+'.jpg')} loading="lazy" decoding="async" width="800" height="500" alt=""/></div>
+   <div class="service-copy">
+    <span class="service-icon"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d={icons[index]}/></svg></span>
+    <h3>{t(lang,titles[item])}</h3><p>{t(lang,intro[item])}</p><span class="more">{t(lang,['Več o storitvi','Explore service','Leistung ansehen'])}</span>
+   </div>
+  </a>
+ </article>)}
+</div>

@@ -1,0 +1,35 @@
+---
+import { countries } from '../lib/form-schema.mjs';
+import { t } from '../lib/content';
+import { position } from '../lib/routes';
+import { copy } from '../lib/form-copy';
+const { field, lang, prefix='', value='' } = Astro.props;
+const {key,labels,type,required,options} = field;
+const id = prefix + key;
+const regions = new Intl.DisplayNames([lang], {type:'region'});
+const countryOptions = countries.map((code:string) => [code,regions.of(code)]).sort((a,b)=>a[1]!.localeCompare(b[1]!,lang));
+const choices = type === 'country' ? countryOptions : options.map((option:string[])=>[option[0],option[position(lang)+1]]);
+const numeric = ['number','integer','year','floor'].includes(type);
+const minimum = type === 'year' ? 1886 : type === 'floor' ? -20 : type === 'number' ? 0.01 : 1;
+const maximum = type === 'year' ? new Date().getFullYear()+1 : type === 'floor' ? 200 : undefined;
+const auto:Record<string,string> = {name:'name',contact:'name',company:'organization',email:'email',phone:'tel'};
+---
+<div class:list={['field',type==='textarea'&&'wide',type==='checkbox'&&'check']}>
+  {type !== 'checkbox' && <label for={id}>{t(lang,labels)}{!required && <small> ({t(lang,copy.optional)})</small>}</label>}
+  {['select','country'].includes(type) ? (
+    <select id={id} name={key} required={required}>
+      <option value="">{t(lang,copy.choose)}</option>
+      {choices.map(([code,label]:[string,string]) => <option value={code} selected={value===code}>{label}</option>)}
+    </select>
+  ) : type === 'textarea' ? (
+    <textarea id={id} name={key} required={required} rows="3" maxlength="1500"></textarea>
+  ) : type === 'checkbox' ? (
+    <label for={id}><input id={id} name={key} type="checkbox" required={required}/><span>{t(lang,labels)}{!required && <small> ({t(lang,copy.optional)})</small>}</span></label>
+  ) : (
+    <input id={id} name={key} type={numeric ? 'number' : type} required={required} min={numeric ? minimum : undefined}
+      max={maximum} step={numeric ? (type==='number'?'0.01':'1') : undefined}
+      maxlength={['text','tel','email'].includes(type) ? 254 : undefined}
+      autocomplete={auto[key] || undefined} value={value || undefined}/>
+  )}
+  <span class="field-error" id={id+'-error'} hidden></span>
+</div>

@@ -1,0 +1,14 @@
+{
+  "name":"DZ Transport",
+  "parentName":"DZ Auto Trade",
+  "parentUrl":"https://dzautotrade.si",
+  "productionDomain":"https://transport.dzautotrade.si",
+  "operator":"","address":"","registration":"","vat":"","email":"","telephone":"",
+  "socialLinks":{},
+  "languages":["sl","en","de"],
+  "defaultLanguage":"sl",
+  "endpoints":{"inquiry":"","partner":""},
+  "privacy":{"retention":"","provider":"Formspree"},
+  "analytics":{"enabled":false},
+  "features":{"inquiries":true,"partners":true}
+}
