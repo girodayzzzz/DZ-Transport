@@ -174,10 +174,10 @@ test('eligible carrier filters and requests a Quick Deal',async({page})=>{
  await open('carrier');
  const deals=page.locator('article').filter({has:page.getByRole('heading',{name:labels.quickDeals})});
  await expect(deals.getByText('Fixture transport')).toBeVisible();
- await deals.getByLabel(labels.status,{exact:true}).selectOption('reserved');
+ await deals.getByRole('combobox',{name:labels.status,exact:true}).selectOption('reserved');
  await deals.getByRole('button',{name:labels.search,exact:true}).click();
  await expect(deals.getByText('Fixture transport')).toHaveCount(0);
- await deals.getByLabel(labels.status,{exact:true}).selectOption('all');
+ await deals.getByRole('combobox',{name:labels.status,exact:true}).selectOption('all');
  await deals.getByRole('button',{name:labels.search,exact:true}).click();
  await deals.locator('summary').filter({hasText:labels.quickDealRequest}).click();
  await deals.getByRole('button',{name:labels.quickDealRequest,exact:true}).click();

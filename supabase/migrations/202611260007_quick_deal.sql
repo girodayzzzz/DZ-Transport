@@ -175,8 +175,20 @@ $$;
 
 alter table public.notifications drop constraint notifications_event_check,
  add constraint notifications_event_check check (event in (
-  'inquiry_received','partner_applied','offer_prepared','offer_accepted','status_changed','quick_deal_requested'
+  'inquiry_received','partner_applied','offer_prepared','offer_accepted','status_changed','quick_deal_requested','quick_deal_reserved'
  ));
+
+alter policy own_notifications on public.notifications using (
+ recipient_id=(select auth.uid()) and (select dz_private.confirmed())
+ and (event='status_changed' or (event='quick_deal_reserved' and (select dz_private.has_role('partner')))
+  or (select dz_private.has_role('admin'))));
+create or replace function public.mark_notification_read(p_notification uuid)
+returns void language sql security definer set search_path='' as $$
+ update public.notifications set read_at=now()
+ where id=p_notification and recipient_id=auth.uid() and read_at is null and dz_private.confirmed()
+ and (event='status_changed' or (event='quick_deal_reserved' and dz_private.has_role('partner'))
+  or dz_private.has_role('admin'));
+$$;
 
 create function public.request_quick_deal(p_deal uuid)
 returns void language plpgsql security definer set search_path='' as $$
@@ -221,6 +233,7 @@ begin
  update dz_private.quick_deals d set reserved_partner=p_partner,
   reserved_until=least(deal.expires_at,eligibility_expiry,clock_timestamp()+make_interval(mins=>s.reservation_minutes))
  from dz_private.quick_deal_settings s where d.id=p_deal;
+ insert into public.notifications(recipient_id,event) values(p_partner,'quick_deal_reserved');
 end $$;
 
 create function public.cancel_quick_deal(p_deal uuid)

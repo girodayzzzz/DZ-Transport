@@ -115,6 +115,13 @@ end $$;
 select public.assign_quick_deal(:'deal',:'order_id','Fixture transport instructions',true);
 do $$
 begin
+ begin
+  perform public.assign_quick_deal(current_setting('dz_test.deal')::uuid,current_setting('dz_test.order')::uuid,'Fixture',true);
+  raise exception 'Duplicate assignment succeeded' using errcode='XX000';
+ exception when raise_exception then null; end;
+end $$;
+do $$
+begin
  if (select count(*) from public.transport_assignments where order_id=current_setting('dz_test.order')::uuid)<>1
  or not exists(select 1 from public.list_quick_deals() where status='assigned')
  or not exists(select 1 from public.quote_costs where carrier_minor=50000)
@@ -123,8 +130,16 @@ end $$;
 select set_config('request.jwt.claims','{"sub":"50000000-0000-0000-0000-000000000003","aal":"aal1"}',true);
 do $$
 begin
- if not exists(select 1 from public.notifications where event='status_changed')
+ if (select count(*) from public.notifications where event='quick_deal_reserved')<>1
+ or not exists(select 1 from public.notifications where event='status_changed')
  or exists(select 1 from public.transport_quotes)
  or exists(select 1 from public.quote_costs) then raise exception 'Assignment notification or financial access failure'; end if;
+end $$;
+select public.mark_notification_read(id) from public.notifications where event='quick_deal_reserved';
+do $$
+begin
+ if exists(select 1 from public.notifications where event='quick_deal_reserved' and read_at is null) then
+  raise exception 'Carrier cannot mark its reservation notification read';
+ end if;
 end $$;
 rollback;

@@ -3,7 +3,8 @@ set -euo pipefail
 
 # Run after migrations on a disposable test database with bootstrap.sql applied.
 work_dir=$(mktemp -d)
-trap 'rm -rf "$work_dir"' EXIT
+winner=
+trap 'if test -n "$winner"; then touch "$work_dir/abort"; wait "$winner" || true; fi; rm -rf "$work_dir"' EXIT
 psql_args=(-X -qAt -v ON_ERROR_STOP=1)
 base_id=55000000-0000-0000-0000-00000000000
 
@@ -76,6 +77,7 @@ for attempt in {1..100}; do
 done
 touch "$work_dir/abort"
 wait "$winner"
+winner=
 test -f "$work_dir/contended"
 if wait "$contender"; then
  echo 'Competing reservation unexpectedly succeeded' >&2

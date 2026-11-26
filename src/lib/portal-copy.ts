@@ -40,6 +40,7 @@ export const portalCopy = {
  reserved: ['Rezervirano','Reserved','Reserviert'],
  assigned: ['Dodeljeno','Assigned','Zugewiesen'],
  expired: ['Poteklo','Expired','Abgelaufen'],
+ quick_deal_reserved: ['Rezerviran prevoz s fiksno ceno','Quick Deal reservation recorded','Festpreistransport reserviert'],
  quick_deal_requested: ['Nova zahteva za prevoz s fiksno ceno','New Quick Deal acceptance request','Neue Anfrage für Festpreistransport'],
  chooseAccountType:['Izberite vrsto računa','Choose your account type','Wählen Sie Ihren Kontotyp'],
  accountType:['Vrsta računa','Account type','Kontotyp'],
