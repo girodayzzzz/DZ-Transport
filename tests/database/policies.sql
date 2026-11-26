@@ -10,6 +10,8 @@ insert into public.user_roles(user_id,role,approved) values('00000000-0000-0000-
 set local role anon;
 do $$
 begin
+ begin perform public.choose_customer_account_type('private_customer'); raise exception 'Anonymous onboarding allowed';
+ exception when insufficient_privilege then null; end;
  begin perform id from public.transport_inquiries; raise exception 'Anonymous read allowed';
  exception when insufficient_privilege then null; end;
  begin perform public.submit_customer_inquiry(gen_random_uuid(),'A','B','test'); raise exception 'Anonymous RPC allowed';
@@ -155,5 +157,49 @@ select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000
 do $$
 begin
  if exists(select 1 from public.transport_opportunities) or exists(select 1 from public.transport_assignments) then raise exception 'Suspension ineffective'; end if;
+end $$;
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000005","aal":"aal1"}',true);
+do $$
+begin
+ begin
+  perform public.choose_customer_account_type('private_customer');
+  raise exception 'Unconfirmed onboarding allowed' using errcode='XX000';
+ exception when raise_exception then null; end;
+end $$;
+
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000001","aal":"aal1"}',true);
+select public.choose_customer_account_type('business_customer');
+do $$
+begin
+ begin
+  update public.profiles set onboarding_completed_at=now();
+  raise exception 'Direct completion allowed';
+ exception when insufficient_privilege then null; end;
+ begin
+  perform public.choose_customer_account_type('admin');
+  raise exception 'Privileged classification allowed' using errcode='XX000';
+ exception when raise_exception then null; end;
+ begin
+  perform public.complete_free_customer_onboarding('Synthetic Buyer');
+  raise exception 'Business account without company name allowed' using errcode='XX000';
+ exception when raise_exception then null; end;
+end $$;
+select public.complete_free_customer_onboarding('Synthetic Buyer','Synthetic Business');
+select public.complete_free_customer_onboarding('Retry','Ignored');
+select public.choose_customer_account_type('private_customer');
+do $$
+begin
+ if not exists(select 1 from public.profiles
+  where account_type='business_customer' and business_name='Synthetic Business'
+  and display_name='Synthetic Buyer' and onboarding_completed_at is not null)
+  or exists(select 1 from public.user_roles) then raise exception 'Incorrect onboarding state'; end if;
+end $$;
+
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000002","aal":"aal1"}',true);
+do $$
+begin
+ if exists(select 1 from public.profiles where business_name='Synthetic Business') then
+  raise exception 'Cross-customer business profile read allowed';
+ end if;
 end $$;
 rollback;

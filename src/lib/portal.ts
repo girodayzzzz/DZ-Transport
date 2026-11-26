@@ -6,7 +6,7 @@ export type Field = {name:string; label:string; type?:string; min?:number; max?:
 
 export async function mountPortal(root:HTMLElement) {
  const {configuration,labels,links}=JSON.parse(root.dataset.init!) as {
-  configuration:{url:string;key:string;google:boolean};
+  configuration:{url:string;key:string;google:boolean;onboarding?:boolean};
   labels:Record<string,string>;
   links:Record<string,string>;
  };
@@ -89,6 +89,12 @@ export async function mountPortal(root:HTMLElement) {
  const password:Field={name:'password',label:labels.password,type:'password',autocomplete:'current-password'};
  const strongPassword={...password,min:12,max:72,autocomplete:'new-password'};
  const auth=client.auth;
+ const googleButton=()=>{
+  if(configuration.google) form(body,[],labels.google,async ()=>{
+   ensure(await auth.signInWithOAuth({provider:'google',options:{redirectTo:absolute(links.callback)}}));
+  });
+ };
+
  try {
   show('');
   if (['callback','verify'].includes(page)) {
@@ -116,9 +122,7 @@ export async function mountPortal(root:HTMLElement) {
     ensure(await auth.signInWithPassword({email:value(values,'email'),password:value(values,'password')}));
     move('customer');
    });
-   if(configuration.google) form(body,[],labels.google,async ()=>{
-    ensure(await auth.signInWithOAuth({provider:'google',options:{redirectTo:absolute(links.callback)}}));
-   });
+   googleButton();
    return;
   }
   if(page==='register') {
@@ -131,6 +135,7 @@ export async function mountPortal(root:HTMLElement) {
     if(result.session) ensure(await auth.signOut());
     show(labels.mailSent);
    });
+   googleButton();
    return;
   }
   if(page==='forgot') {
@@ -155,6 +160,41 @@ export async function mountPortal(root:HTMLElement) {
     move('login');
    }
   });
+  if(page==='customer' && configuration.onboarding) {
+   const profile=unwrap(await client.from('profiles')
+    .select('account_type,display_name,onboarding_completed_at').eq('id',user.id).maybeSingle());
+   if(!profile?.onboarding_completed_at) {
+    const renderType=()=>{
+     body.replaceChildren(el('h2',labels.chooseAccountType));
+     form(body,[{name:'account_type',label:labels.accountType,value:profile?.account_type,options:[
+      ['private_customer',labels.privateCustomer],['business_customer',labels.businessCustomer]
+     ]}],labels.continueSetup,async values=>{
+      ensure(await client.rpc('choose_customer_account_type',{p_type:value(values,'account_type')}));
+      move('customer');
+     });
+    };
+    if(!profile?.account_type) {
+     renderType();
+     return;
+    }
+    body.append(el('h2',labels.completeCustomerProfile),el('p',labels.freeCustomerSetup));
+    const fields:Field[]=[{name:'display_name',label:labels.name,max:120,value:profile.display_name,autocomplete:'name'}];
+    if(profile.account_type==='business_customer') {
+     fields.push({name:'business_name',label:labels.registeredBusinessName,max:160,autocomplete:'organization'});
+    }
+    form(body,fields,labels.activateFree,async values=>{
+     ensure(await client.rpc('complete_free_customer_onboarding',{
+      p_name:value(values,'display_name'),p_business_name:value(values,'business_name') || null
+     }));
+     move('customer');
+    });
+    const back=el('button',labels.changeAccountType);
+    back.type='button';
+    back.addEventListener('click',renderType);
+    body.append(back);
+    return;
+   }
+  }
   if(page==='reset') {
    if(sessionStorage.getItem('dz-recovery')!==user.id) {show(labels.recoveryHelp);return;}
    form(body,[strongPassword],labels.save,async values=>{

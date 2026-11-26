@@ -6,5 +6,5 @@ export function portalConfiguration(env, production) {
   throw new Error('Portal requires a hosted Supabase URL and a publishable key');
  }
  return {url, key, google:env.PUBLIC_DZ_GOOGLE === 'true', manager:env.PUBLIC_DZ_MANAGER === 'true',
-  partner:env.PUBLIC_DZ_PARTNER === 'true'};
+  partner:env.PUBLIC_DZ_PARTNER === 'true', onboarding:env.PUBLIC_DZ_CUSTOMER_ONBOARDING === 'true'};
 }

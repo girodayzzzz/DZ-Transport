@@ -9,3 +9,7 @@
 ## After V2 review
 
 Complete owner configuration, legal sign-off and synthetic acceptance checks before production. Then pilot the private intake inbox and partner verification workflow described in [DZ Transport Manager](docs/DZ-TRANSPORT-MANAGER.md), before quotation and dispatch automation.
+
+## V4 continuation
+
+See the [V4 audit and continuation](docs/V4-AUDIT.md) for the customer onboarding slice, the status of the existing V3 workflows and the remaining release sequence.

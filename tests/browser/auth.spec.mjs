@@ -12,12 +12,13 @@ const routes={
 };
 const links=Object.fromEntries(Object.entries(routes).map(([key,path])=>[key,base+'/en/'+path+'/']));
 const labels=Object.fromEntries(Object.entries({...portalCopy,...portalTitles,...statusLabels}).map(([key,values])=>[key,values[1]]));
-const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google:false},labels,links});
 const user={id:'cccccccc-cccc-4ccc-bccc-cccccccccccc',email:'customer@example.invalid',
  email_confirmed_at:'2026-11-26T12:00:00Z',app_metadata:{},user_metadata:{},aud:'authenticated'};
 const secret='synthetic-test-password';
 
-async function setup(page) {
+async function setup(page,{onboarding=false,google=false}={}) {
+ const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google,onboarding},labels,links});
+ let profile=null;
  const calls=[];
  await page.route(origin+'/**',async route=>{
   const url=new URL(route.request().url());
@@ -46,6 +47,19 @@ async function setup(page) {
   const respond=(json,status=200)=>route.fulfill({status,headers,json});
   const session={access_token:'fixture-access-token',refresh_token:'fixture-refresh-token',
    token_type:'bearer',expires_in:3600,user};
+  if(url.pathname==='/auth/v1/authorize') return route.fulfill({
+   contentType:'text/html',
+   body:'<a href="'+origin+links.callback+'?code=synthetic-oauth-code">Approve fixture consent</a>'
+  });
+  if(url.pathname==='/rest/v1/profiles') return respond(profile ? [profile] : []);
+  if(url.pathname.endsWith('/rpc/choose_customer_account_type')) {
+   profile={account_type:data.p_type,display_name:'',onboarding_completed_at:null};
+   return route.fulfill({status:204,headers});
+  }
+  if(url.pathname.endsWith('/rpc/complete_free_customer_onboarding')) {
+   profile={...profile,display_name:data.p_name,onboarding_completed_at:new Date().toISOString()};
+   return route.fulfill({status:204,headers});
+  }
   if(url.pathname==='/auth/v1/signup') return respond({user,session:null});
   if(url.pathname==='/auth/v1/recover') return respond({});
   if(url.pathname==='/auth/v1/verify') return respond(session);
@@ -62,7 +76,7 @@ async function setup(page) {
 }
 
 test('registration, email confirmation, sign-out and ordinary login',async({page})=>{
- const {calls,open}=await setup(page);
+ const {calls,open}=await setup(page,{onboarding:true});
  await open('register');
  await page.getByLabel('Email',{exact:true}).fill(user.email);
  await page.getByLabel('Password',{exact:true}).fill(secret);
@@ -71,6 +85,11 @@ test('registration, email confirmation, sign-out and ordinary login',async({page
  expect(calls.find(call=>call.path.endsWith('/signup')).search).toContain(encodeURIComponent(origin+links.verify));
  await page.goto(origin+links.verify+'#token_hash=fixture-email&type=email');
  await expect(page).toHaveURL(origin+links.customer);
+ await page.getByRole('combobox',{name:labels.accountType,exact:true}).selectOption('private_customer');
+ await page.getByRole('button',{name:labels.continueSetup,exact:true}).click();
+ await page.getByLabel(labels.name,{exact:true}).fill('Synthetic Private Customer');
+ await expect(page.getByLabel(labels.registeredBusinessName,{exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:labels.activateFree,exact:true}).click();
  await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toBeVisible();
  await open('logout');
  await page.getByRole('button',{name:'Sign out',exact:true}).click();
@@ -103,4 +122,29 @@ test('password recovery and a refused expired session',async({page})=>{
  await expect(page.locator('[data-portal-status]')).toHaveText(labels.authRequired);
  expect(calls.some(call=>call.search.includes('grant_type=refresh_token'))).toBeTruthy();
  await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toHaveCount(0);
+});
+
+test('Google registration shares resumable business customer onboarding',async({page})=>{
+ const {calls,open}=await setup(page,{onboarding:true,google:true});
+ await open('register');
+ await page.getByRole('button',{name:labels.google,exact:true}).click();
+ const consent=page.getByRole('link',{name:'Approve fixture consent'});
+ await expect(consent).toBeVisible();
+ const authorize=new URL(page.url());
+ expect(authorize.searchParams.get('provider')).toBe('google');
+ expect(authorize.searchParams.get('redirect_to')).toBe(origin+links.callback);
+ expect(authorize.searchParams.get('code_challenge_method')).toBe('s256');
+ await consent.click();
+ await expect(page.getByRole('heading',{name:labels.chooseAccountType})).toBeVisible();
+ expect(calls.some(call=>call.search.includes('grant_type=pkce') && call.data?.auth_code==='synthetic-oauth-code')).toBeTruthy();
+ await page.getByRole('combobox',{name:labels.accountType,exact:true}).selectOption('business_customer');
+ await page.getByRole('button',{name:labels.continueSetup,exact:true}).click();
+ await expect(page.getByRole('heading',{name:labels.completeCustomerProfile})).toBeVisible();
+ await page.reload();
+ await page.getByLabel(labels.name,{exact:true}).fill('Synthetic Customer');
+ await page.getByLabel(labels.registeredBusinessName,{exact:true}).fill('Synthetic Transport Buyer');
+ await page.getByRole('button',{name:labels.activateFree,exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toBeVisible();
+ expect(calls.find(call=>call.path.endsWith('/complete_free_customer_onboarding')).data)
+  .toEqual({p_name:'Synthetic Customer',p_business_name:'Synthetic Transport Buyer'});
 });
