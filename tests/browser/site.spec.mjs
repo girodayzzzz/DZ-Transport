@@ -97,6 +97,15 @@ test('localized desktop, tablet and mobile menus and quick quote transfer',async
  await expect(byName(page,'deliveryPostal')).toHaveValue('10115');
 });
 
+test('long German footer labels fit on narrow pages',async({page})=>{
+ await useFiles(page);
+ await page.setViewportSize({width:320,height:880});
+ for (const suffix of ['/de/leistungen/','/de/partner/']) {
+  await page.goto(path(suffix));
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+ }
+});
+
 test('all transport categories select the right conditional fields and show validation',async({page})=>{
  await useFiles(page);
  for(const category of Object.keys(grouping)){
