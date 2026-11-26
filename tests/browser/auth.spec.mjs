@@ -48,7 +48,8 @@ async function setup(page,{onboarding=false,google=false}={}) {
   const session={access_token:'fixture-access-token',refresh_token:'fixture-refresh-token',
    token_type:'bearer',expires_in:3600,user};
   if(url.pathname==='/auth/v1/authorize') return route.fulfill({
-   status:302,headers:{...headers,location:origin+links.callback+'?code=synthetic-oauth-code'}
+   contentType:'text/html',
+   body:'<a href="'+origin+links.callback+'?code=synthetic-oauth-code">Approve fixture consent</a>'
   });
   if(url.pathname==='/rest/v1/profiles') return respond(profile ? [profile] : []);
   if(url.pathname.endsWith('/rpc/choose_customer_account_type')) {
@@ -127,6 +128,13 @@ test('Google registration shares resumable business customer onboarding',async({
  const {calls,open}=await setup(page,{onboarding:true,google:true});
  await open('register');
  await page.getByRole('button',{name:labels.google,exact:true}).click();
+ const consent=page.getByRole('link',{name:'Approve fixture consent'});
+ await expect(consent).toBeVisible();
+ const authorize=new URL(page.url());
+ expect(authorize.searchParams.get('provider')).toBe('google');
+ expect(authorize.searchParams.get('redirect_to')).toBe(origin+links.callback);
+ expect(authorize.searchParams.get('code_challenge_method')).toBe('s256');
+ await consent.click();
  await expect(page.getByRole('heading',{name:labels.chooseAccountType})).toBeVisible();
  expect(calls.some(call=>call.search.includes('grant_type=pkce') && call.data?.auth_code==='synthetic-oauth-code')).toBeTruthy();
  await page.getByRole('combobox',{name:labels.accountType,exact:true}).selectOption('business_customer');
