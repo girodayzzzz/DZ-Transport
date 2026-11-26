@@ -87,6 +87,12 @@ const noindex=['missing','confirmation'].includes(page);
  </footer>
  {page!=='inquiry' && <a class="button primary mobile-quote" href={url(lang,'inquiry')}>{quote}</a>}
  <script>
+  const quick=document.querySelector('[data-quick]');
+  const mobileQuote=document.querySelector('.mobile-quote');
+  if (quick && mobileQuote) {
+   const observer=new IntersectionObserver(([entry])=>mobileQuote.toggleAttribute('data-obscures-form',entry.isIntersecting));
+   observer.observe(quick);
+  }
   const nav=document.querySelector<HTMLElement>('[data-navigation]')!;
   const menu=document.querySelector<HTMLButtonElement>('[data-menu]')!;
   const toggle=(open:boolean)=>{

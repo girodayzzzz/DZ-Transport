@@ -152,8 +152,9 @@ legend{padding-inline:.3rem;font-weight:760}
 .summary dt{font-weight:650}
 .summary dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 .quick .field label{line-height:1.25}
-@media(max-width:1050px){.quick form{grid-template-columns:repeat(3,minmax(0,1fr))}.header-quote{display:none}.navigation{margin-left:auto}}
-@media(max-width:760px){
+@media(max-width:1050px){.quick form{grid-template-columns:repeat(3,minmax(0,1fr))}.navigation{margin-left:auto}}
+@media(max-width:1000px){
+ .header-quote{display:none}
  .wrap{width:calc(100% - 2rem)}
  .header-row{min-height:62px}
  .menu-toggle{display:grid;gap:4px;place-content:center;width:44px;height:44px;border:1px solid #57708e;border-radius:5px;background:transparent}
@@ -162,6 +163,7 @@ legend{padding-inline:.3rem;font-weight:760}
  .navigation[data-open]{display:grid}
  .navigation .dropdown{position:static;box-shadow:none}
  .mobile-quote{display:flex;position:fixed;z-index:3;bottom:max(.7rem,env(safe-area-inset-bottom));right:1rem;box-shadow:0 4px 15px #0b172847}
+ .mobile-quote[data-obscures-form]{display:none}
  body:has(.mobile-quote) .footer{padding-bottom:5rem}
  .hero{min-height:495px}
  .hero::after{background:linear-gradient(90deg,#0b1728f5,#0b1728a8)}
@@ -184,7 +186,7 @@ legend{padding-inline:.3rem;font-weight:760}
  .summary dl{font-size:.91rem}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}}
-@media(min-width:761px){
+@media(min-width:1001px){
  .hero picture{left:auto;width:77%}
  .hero img{object-position:8% 54%}
  .hero::after{background:linear-gradient(90deg,#0b1728 0%,#0b1728 18%,#0b1728e9 30%,#0b172875 56%,#0b172814 100%)}

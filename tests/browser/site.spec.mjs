@@ -64,12 +64,14 @@ test('localized desktop, tablet and mobile menus and quick quote transfer',async
   await page.goto(path('/'));
   await expect(page.getByRole('heading',{level:1})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-  if(width<=760){
+  if(width<=1000){
    const menu=page.getByRole('button',{name:'Meni',exact:true});
    await menu.click();
    await expect(page.getByRole('navigation',{name:'Glavna navigacija'})).toBeVisible();
    await page.keyboard.press('Escape');
    await expect(menu).toHaveAttribute('aria-expanded','false');
+   await page.locator('[data-quick]').scrollIntoViewIfNeeded();
+   await expect(page.locator('.mobile-quote')).toBeHidden();
   }
  }
  await page.getByLabel('Jezik',{exact:true}).click();
