@@ -16,3 +16,7 @@ The SQL fixtures verify anonymous denial, unconfirmed account denial, cross-cust
 Database model and mocked endpoint testing cannot verify a hosted project’s configuration. Release depends on the owner verifying Auth email, provider credentials, policies as deployed, project region and required legal approvals. Public CAPTCHA coverage currently applies to the optional guest endpoint. Auth signup and recovery are also subject to Supabase’s own rates and owner-selected abuse settings.
 
 V4 exercises customer onboarding in the isolated PostgreSQL policy suite, including anonymous and unconfirmed rejection, privileged account type rejection, blocked direct writes, business-name validation, duplicate activation and customer isolation. The Playwright OAuth test uses synthetic intercepted responses and verifies the browser's PKCE exchange, resumed setup and free activation. Hosted verification requires the rehearsal in [Google OAuth setup](GOOGLE-OAUTH-SETUP.md).
+
+## Quick Deal
+
+After applying all migrations to a disposable PostgreSQL database with `tests/database/bootstrap.sql`, run `psql -v ON_ERROR_STOP=1 -f tests/database/policies.sql`, `psql -v ON_ERROR_STOP=1 -f tests/database/quick-deal.sql` and `bash tests/database/quick-deal-concurrency.sh`. The concurrency test uses independent authenticated sessions and verifies actual lock contention, exclusive reservation and rejection of the competing carrier. CI uses the same scripts. Playwright covers the partner flow with mocked Supabase responses. Hosted Supabase and production rehearsal remain pending.

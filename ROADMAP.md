@@ -13,3 +13,7 @@ Complete owner configuration, legal sign-off and synthetic acceptance checks bef
 ## V4 continuation
 
 See the [V4 audit and continuation](docs/V4-AUDIT.md) for the customer onboarding slice, the status of the existing V3 workflows and the remaining release sequence.
+
+## V5 continuation
+
+See the [delivery matrix](docs/V5-DELIVERY.md) for the verified work and outstanding modules. Evidence-backed carrier verification and organization permissions precede broader marketplace rollout.

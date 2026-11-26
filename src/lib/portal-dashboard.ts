@@ -12,18 +12,28 @@ type Context = {
  el:<K extends keyof HTMLElementTagNameMap>(tag:K,text?:string)=>HTMLElementTagNameMap[K];
  unwrap:<T>(response:{data:T;error:unknown})=>T;
  userId:string;
+ quickDeal?:boolean;
 };
 type Row = Record<string,string|number|boolean|null>;
 type Columns = [string,string][];
 
-export async function mountDashboard({client,page,body,labels,form,show,el,unwrap,userId}:Context) {
+export async function mountDashboard({client,page,body,labels,form,show,el,unwrap,userId,quickDeal}:Context) {
  const text=(key:string)=>labels[key] || key;
  const language=['sl','en','de'].indexOf(document.documentElement.lang);
  const inquiryFieldLabels=new Map([...customerFields,...location('pickup'),...location('delivery'),...Object.values(cargo).flat(),
   ...cargoItem,...companyFields,...recurringFields,...schedule,...consents,regulated,oversized].map(field=>[field.key,field.labels[language]]));
  const cell=(key:string,value:Row[string])=>{
   if(value===null || value===undefined) return '—';
-  if(key==='created_at') return new Intl.DateTimeFormat(document.documentElement.lang,{dateStyle:'medium',timeStyle:'short'}).format(new Date(String(value)));
+  if(['created_at','expires_at','eligible_until','requested_at','reserved_until'].includes(key)) return new Intl.DateTimeFormat(document.documentElement.lang,{dateStyle:'medium',timeStyle:'short'}).format(new Date(String(value)));
+  if(key==='pickup_window' || key==='delivery_window') {
+   const match=/^\[(\d{4}-\d{2}-\d{2}),(\d{4}-\d{2}-\d{2})\)$/.exec(String(value));
+   if(match) {
+    const [first,last]=match.slice(1).map(day=>new Date(day));
+    last.setUTCDate(last.getUTCDate()-1);
+    const formatter=new Intl.DateTimeFormat(document.documentElement.lang,{dateStyle:'medium',timeZone:'UTC'});
+    return formatter.formatRange(first,last);
+   }
+  }
   if(['status','state','event'].includes(key)) return text(String(value));
   return String(value);
  };
@@ -130,6 +140,105 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   table(section('history'),related(history),historyColumns);
  }
 
+ const dealColumns:Columns=[
+  ['reference','reference'],['cargo_category','cargo'],['pickup_region','origin'],['delivery_region','destination'],
+  ['status','status'],['carrier_minor','quickDealPrice'],['currency','currency'],['expires_at','valid']
+ ];
+ const dealDetails:Columns=[
+  ['pickup_window','origin'],['delivery_window','destination'],['vehicle_requirements','quickDealVehicle'],
+  ['weight_kg','quickDealWeight'],['dimensions','quickDealDimensions'],['vat_treatment','vat'],
+  ['conditions','quickDealConditions'],['eligibility_requirements','quickDealRequirements']
+ ];
+ function showDealDetails(parent:HTMLElement,row:Row) {
+  const details=el('details');
+  details.append(el('summary',labels.details));
+  const list=el('dl');
+  for(const [key,label] of dealDetails) {
+   list.append(el('dt',text(label)),el('dd',cell(key,row[key])));
+  }
+  details.append(list);
+  parent.append(details);
+ }
+
+ async function carrierDeals() {
+  const deals=await rpc('list_quick_deals',{}) as Row[];
+  const panel=section('quickDeals');
+  panel.append(el('p',labels.quickDealHelp));
+  const listings=el('div');
+  form(panel,[field('status','status',{options:options(['all','available','acceptance_requested','reserved'])})],
+   labels.search,async data=>display(read(data,'status')));
+  panel.append(listings);
+  display('all');
+  function display(status:string) {
+   listings.replaceChildren();
+   table(listings,deals.filter(row=>status==='all' || row.status===status),dealColumns,(parent,row)=>{
+    showDealDetails(parent,row);
+    if(!row.has_requested && (row.status==='available' || row.status==='reserved')) {
+     action(parent,'quickDealRequest',[],async()=>{await rpc('request_quick_deal',{p_deal:row.id});});
+    }
+   });
+  }
+ }
+
+ function draftDeal(parent:HTMLElement,inquiry:Row) {
+  parent.append(el('p',labels.quickDealSafeSummary));
+  action(parent,'quickDealCreate',[
+   field('p_category','cargo',{max:120}),field('p_pickup_region','origin',{max:120}),field('p_delivery_region','destination',{max:120}),
+   field('pickupStart','quickDealPickupFrom',{type:'date'}),field('pickupEnd','quickDealPickupTo',{type:'date'}),
+   field('deliveryStart','quickDealDeliveryFrom',{type:'date'}),field('deliveryEnd','quickDealDeliveryTo',{type:'date'}),
+   field('p_vehicle','quickDealVehicle',{max:500}),field('p_weight_kg','quickDealWeight',{type:'number',min:.01,max:1000000,step:.01}),
+   field('p_dimensions','quickDealDimensions',{max:500}),field('p_carrier_minor','quickDealPrice',{type:'number',min:1}),
+   field('p_currency','currency',{options:options(['EUR','CHF','GBP'])}),field('p_vat','vat'),
+   field('p_conditions','quickDealConditions',{type:'textarea',max:1500,optional:true}),
+   field('p_requirements','quickDealRequirements',{type:'textarea',max:1500}),field('p_expires_at','valid',{type:'datetime-local'})
+  ],async data=>{
+   const args=Object.fromEntries([...data].filter(([key])=>key.startsWith('p_')));
+   await rpc('draft_quick_deal',{
+    ...args,p_inquiry:inquiry.id,p_expires_at:new Date(read(data,'p_expires_at')).toISOString(),
+    p_weight_kg:Number(read(data,'p_weight_kg')),p_carrier_minor:Number(read(data,'p_carrier_minor')),
+    p_pickup:'['+read(data,'pickupStart')+','+read(data,'pickupEnd')+']',
+    p_delivery:'['+read(data,'deliveryStart')+','+read(data,'deliveryEnd')+']'
+   });
+  });
+ }
+
+ function manageDeal(parent:HTMLElement,deal:Row,order:Row|undefined,partners:[string,string][]) {
+  table(parent,[deal],dealColumns);
+  showDealDetails(parent,deal);
+  if(!['draft','available','acceptance_requested','reserved'].includes(String(deal.status))) return;
+  parent.append(el('p',labels.quickDealHelp));
+  if(deal.status==='reserved') {
+   const carrier=partners.find(([id])=>id===deal.reserved_partner)?.[1];
+   if(carrier) parent.append(el('p',carrier+' · '+cell('reserved_until',deal.reserved_until)));
+  }
+  if(deal.status==='draft') {
+   action(parent,'quickDealPublish',[],async()=>{await rpc('publish_quick_deal',{p_deal:deal.id});});
+  }
+  if(partners.length) action(parent,'quickDealAttest',[
+   field('partner','partner',{options:partners}),field('until','valid',{type:'datetime-local'})
+  ],async data=>{
+   await rpc('attest_quick_deal_eligibility',{p_deal:deal.id,p_partner:read(data,'partner'),
+    p_eligible_until:new Date(read(data,'until')).toISOString()});
+  });
+  if(deal.status!=='draft') {
+   const requests=el('div');
+   form(parent,[],labels.quickDealRequests,async()=>{
+    const candidates=await rpc('quick_deal_requests',{p_deal:deal.id}) as Row[];
+    requests.replaceChildren();
+    table(requests,candidates,[['company_name','company'],['eligible_until','valid'],['requested_at','date']],(cell,row)=>{
+     action(cell,'quickDealReserve',[],async()=>{await rpc('reserve_quick_deal',{p_deal:deal.id,p_partner:row.partner_id});});
+    });
+   });
+   parent.append(requests);
+  }
+  if(deal.status==='reserved' && order) {
+   action(parent,'quickDealAssign',[field('instructions','instructions',{type:'textarea',max:4000})],async data=>{
+    await rpc('assign_quick_deal',{p_deal:deal.id,p_order:order.id,p_instructions:read(data,'instructions'),p_contract_confirmed:true});
+   });
+  }
+  action(parent,'quickDealCancel',[],async()=>{await rpc('cancel_quick_deal',{p_deal:deal.id});});
+ }
+
  async function carrier() {
   const [applications,companies,opportunities,quotes,assignments,orders,history]=await Promise.all([
    unwrapQuery('partner_applications','id,state','applicant_id',userId),
@@ -150,6 +259,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   }
   table(section('company'),companies,[['name','company'],['services','services'],['coverage','coverage']]);
   if(applications[0].state!=='approved') return;
+  if(quickDeal) await carrierDeals();
   const submitted=quotes.filter(row=>opportunities.some(opportunity=>opportunity.id===row.opportunity_id));
   table(section('opportunities'),opportunities.filter(row=>row.open),[['id','reference'],['summary','description']],(parent,row)=>{
    if(!submitted.some(quote=>quote.opportunity_id===row.id)) {
@@ -169,7 +279,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
  }
 
  async function manager() {
-  const [inquiries,applications,companies,quotes,costs,orders,notes,financials,stats,deletions]=await Promise.all([
+  const [inquiries,applications,companies,quotes,costs,orders,notes,financials,stats,deletions,quickDeals]=await Promise.all([
    rows('transport_inquiries','id,reference,origin,destination,status,contact_email,contact_name,description,archived_at,customer_id'),
    rows('partner_applications','id,applicant_id,state'),
    rows('companies','owner_id,name,services,coverage'),
@@ -179,7 +289,8 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
    rows('internal_notes','inquiry_id,body,created_at'),
    rpc('manager_financials',{}),
    rpc('manager_counts',{}),
-   rows('account_deletion_requests','user_id,created_at')
+   rows('account_deletion_requests','user_id,created_at'),
+   quickDeal ? rpc('list_quick_deals',{}) as Promise<Row[]> : []
   ]);
   const overview=section('overview');
   const counts=(stats as Row[])[0];
@@ -272,16 +383,20 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
     if(next.length) action(details,'update',[field('next','status',{options:options(next)})],async data=>{
      await rpc('advance_transport',{p_inquiry:row.id,p_next:read(data,'next')});
     });
+    const order=orders.find(order=>order.inquiry_id===row.id);
+    const deal=quickDeals.find(deal=>deal.reference===row.reference);
+    const activeDeal=deal && ['available','acceptance_requested','reserved'].includes(String(deal.status));
+    if(deal) manageDeal(details,deal,order,partnerOptions);
+    if(quickDeal && !deal && current==='awaiting_carrier_offer') draftDeal(details,row);
     if(current==='awaiting_carrier_offer') {
-     if(partnerOptions.length) action(details,'invite',[
+     if(partnerOptions.length && !activeDeal) action(details,'invite',[
       field('partner','partner',{options:partnerOptions}),field('summary','description',{type:'textarea',max:1500})
      ],async data=>{await rpc('invite_partner',{p_inquiry:row.id,p_partner:read(data,'partner'),p_summary:read(data,'summary')});});
      action(details,'prepare',[...amountFields,field('carrier','carrierCost',{type:'number'}),field('expenses','expenses',{type:'number'})],async data=>{
       await rpc('prepare_customer_offer',{p_inquiry:row.id,...money(data),p_carrier:Number(read(data,'carrier')),p_expenses:Number(read(data,'expenses'))});
      });
     }
-    const order=orders.find(order=>order.inquiry_id===row.id);
-    if(current==='customer_accepted' && order && partnerOptions.length) {
+    if(current==='customer_accepted' && order && partnerOptions.length && !activeDeal) {
      action(details,'assign',[field('partner','partner',{options:partnerOptions}),field('instructions','instructions',{type:'textarea',max:4000})],async data=>{
       await rpc('assign_transport',{p_order:order.id,p_partner:read(data,'partner'),p_instructions:read(data,'instructions')});
      });

@@ -21,3 +21,9 @@
 
 - Rehearse Auth, RLS, MFA, notifications, guest receipts and deletion workflows using synthetic data. Complete [Supabase setup](SUPABASE-SETUP.md) and [security testing](SECURITY-TESTING.md).
 - Keep portal flags disabled until the owner approves activation. Formspree can continue to serve public inquiries while the optional PostgreSQL intake is under review.
+
+## Quick Deal rollout
+
+- [ ] Verify carrier eligibility evidence and owner-approved contract steps.
+- [ ] Apply and rehearse the migration in staging with synthetic manager, carrier and customer accounts, including expiry, cancellation and document validity.
+- [ ] Confirm the production switches remain disabled until approval. Follow the [Quick Deal guide](QUICK-DEAL.md).

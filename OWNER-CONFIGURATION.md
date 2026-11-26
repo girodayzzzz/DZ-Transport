@@ -22,3 +22,7 @@ Use a reviewed change to `config/site.json` for public values. The default build
 ## Portal and guest intake owner settings
 
 Use [Supabase setup](SUPABASE-SETUP.md) for region selection, SMTP, secure administrator provisioning, protected Cloudflare bindings, staged testing and feature activation. See [free-tier planning limits](FREE-TIER-LIMITS.md) and [backup and restore](BACKUP-AND-RESTORE.md).
+
+## Quick Deal
+
+Follow the [Quick Deal staging and approval steps](QUICK-DEAL.md). Leave the database and dashboard switches off in production until the carrier and contractual workflow is approved.

@@ -36,3 +36,7 @@ npm run test:browser
 ```
 
 Repeat with `SITE_URL=https://transport.dzautotrade.si BASE_PATH=/` to verify custom-domain paths in preview mode. Production mode fails the build when essential owner settings are missing.
+
+## V5 baseline result
+
+The [V4 main workflow](https://github.com/girodayzzzz/DZ-Transport/actions/runs/45886737666) passed verification and skipped deployment. The separate legacy Pages job failed. The [V5 audit](docs/V5-BASELINE-AUDIT.md) records endpoint checks. Use the [Quick Deal guide](QUICK-DEAL.md) to stage migrations and independently configure the UI and database switches.
