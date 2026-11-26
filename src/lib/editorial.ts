@@ -1,9 +1,12 @@
 import {booking,coverage} from './content';
 export const business = [
- ['Avtohiše in avtomobilska podjetja','Dealerships and automotive businesses','Autohäuser und Automobilunternehmen'],
- ['Spletni trgovci in trgovine s pohištvom','Online retailers and furniture stores','Onlinehändler und Möbelhäuser'],
- ['Proizvodna in gradbena podjetja','Manufacturers and construction companies','Hersteller und Bauunternehmen'],
- ['Mala in srednje velika podjetja','Small and medium-sized businesses','Kleine und mittlere Unternehmen']
+ [['Avtohiše','Dealerships','Autohäuser'],['Premiki zalog med poslovalnicami in dostava vozil kupcem.','Move stock between showrooms and arrange vehicle handovers to buyers.','Fahrzeuge zwischen Standorten bewegen und an Käufer übergeben.']],
+ [['Uvozniki in izvozniki vozil','Vehicle importers and exporters','Fahrzeugimporteure und -exporteure'],['Uskladite prevzeme pri dobaviteljih in predajo dokumentov.','Coordinate supplier collection windows and document handovers.','Abholfenster bei Lieferanten und Dokumentenübergaben koordinieren.']],
+ [['Avtomobilske delavnice','Automotive workshops','Kfz-Werkstätten'],['Navedite stanje vozila ter potrebe po vitlu in dostopu.','Describe vehicle condition, winch requirements and workshop access.','Fahrzeugzustand, Seilwindenbedarf und Werkstattzufahrt angeben.']],
+ [['Spletni trgovci','Online retailers','Onlinehändler'],['Opišite običajne pakete, relacije in odpremne termine.','Share your typical packages, routes and dispatch windows.','Übliche Packstücke, Strecken und Versandfenster angeben.']],
+ [['Trgovine s pohištvom','Furniture companies','Möbelunternehmen'],['Dogovorite se za prevzem in pogoje dostave težkih ali občutljivih kosov.','Plan pickup and delivery access for bulky or fragile pieces.','Abholung und Zustellzugang für sperrige oder empfindliche Stücke planen.']],
+ [['Proizvodna podjetja','Manufacturers','Industrieunternehmen'],['Navedite dimenzije, maso in opremo na nakladalni rampi.','Specify dimensions, weights and equipment available at the loading dock.','Maße, Gewichte und Ausrüstung an der Laderampe angeben.']],
+ [['Gradbena podjetja','Construction companies','Bauunternehmen'],['Opišite dostop do gradbišča in zahteve za razkladanje.','Describe site access and unloading requirements.','Baustellenzufahrt und Entladeanforderungen beschreiben.']]
 ];
 export const editorial = {
  about:[

@@ -14,7 +14,9 @@ const icons=[
 <div class="service-grid">
  {services.map((item,index)=><article class="service-card">
   <a href={url(lang,item)}>
-   <div class="service-photo"><img src={asset('images/'+item+'.jpg')} loading="lazy" decoding="async" width="800" height="500" alt=""/></div>
+   <div class="service-photo"><img src={asset('images/'+item+'-800.webp')}
+    srcset={asset('images/'+item+'-420.webp')+' 420w, '+asset('images/'+item+'-800.webp')+' 800w'}
+    sizes="(max-width: 520px) 90vw, (max-width: 1000px) 46vw, 380px" loading="lazy" decoding="async" width="800" height="500" alt=""/></div>
    <div class="service-copy">
     <span class="service-icon"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d={icons[index]}/></svg></span>
     <h3>{t(lang,titles[item])}</h3><p>{t(lang,intro[item])}</p><span class="more">{t(lang,['Več o storitvi','Explore service','Leistung ansehen'])}</span>

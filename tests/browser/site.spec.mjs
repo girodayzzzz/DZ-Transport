@@ -59,7 +59,7 @@ async function routeAndCargo(page,category) {
 
 test('localized desktop, tablet and mobile menus and quick quote transfer',async({page})=>{
  await useFiles(page);
- for(const width of [1440,820,375,320]){
+ for(const width of [1440,1024,768,430,390,375,320]){
   await page.setViewportSize({width,height:900});
   await page.goto(path('/'));
   await expect(page.getByRole('heading',{level:1})).toBeVisible();
@@ -97,7 +97,7 @@ test('localized desktop, tablet and mobile menus and quick quote transfer',async
  await expect(byName(page,'deliveryPostal')).toHaveValue('10115');
 });
 
-test('all ten categories select the right conditional fields and show validation',async({page})=>{
+test('all transport categories select the right conditional fields and show validation',async({page})=>{
  await useFiles(page);
  for(const category of Object.keys(grouping)){
   await page.goto(path('/en/inquiry/'));
@@ -105,6 +105,7 @@ test('all ten categories select the right conditional fields and show validation
   await expect(page.getByText('Complete this field.',{exact:true})).toBeVisible();
   await routeAndCargo(page,category);
   await fillRequired(page);
+  if(category==='nonRunning') await byName(page,'running').selectOption('no');
   await byName(page,'regulated').selectOption('yes');
   await expect(page.locator('[data-regulated]')).toBeVisible();
   await btn(page,'Next').click();
@@ -188,3 +189,55 @@ for(const [name,suffix] of [['home','/'],['inquiry','/povprasevanje/'],['partner
   }
  });
 }
+
+test('cargo lines calculate and remove independently and appear in the review',async({page})=>{
+ await useFiles(page);
+ await page.goto(path('/en/inquiry/'));
+ await routeAndCargo(page,'pallet');
+ await fillRequired(page);
+ const panel=page.locator('[data-cargo="pallet"]');
+ const first=panel.locator('.cargo-item').first();
+ await first.locator('[name=quantity]').fill('2');
+ await first.locator('[name=length]').fill('120');
+ await first.locator('[name=width]').fill('80');
+ await first.locator('[name=height]').fill('50');
+ await first.locator('[name=unitWeightKg]').fill('25');
+ await expect(panel.locator('[data-weight]')).toHaveText('50');
+ await expect(panel.locator('[data-volume]')).toHaveText('0.96');
+ await btn(page,'Add cargo item').click();
+ const second=panel.locator('.cargo-item').last();
+ await second.locator('[name=dimensionUnit]').selectOption('m');
+ await fillRequired(page);
+ await expect(panel.locator('[data-weight]')).toHaveText('54');
+ await expect(panel.locator('[data-volume]')).toHaveText('16.96');
+ await second.getByRole('button',{name:'Remove item'}).click();
+ await expect(panel.locator('[data-weight]')).toHaveText('50');
+ await btn(page,'Next').click();
+ await byName(page,'flexible').check();
+ await btn(page,'Next').click();
+ await fillRequired(page);
+ await btn(page,'Next').click();
+ await expect(page.locator('[data-summary] [data-volume]')).toHaveText('0.96');
+});
+
+test('corridor direction and recurring business details use their localized inquiry entry points',async({page})=>{
+ await useFiles(page);
+ await page.goto(path('/de/'));
+ await page.getByRole('link',{name:'Transport zwischen Slowenien und Italien'}).click();
+ await page.getByRole('link',{name:'Nach Slowenien'}).click();
+ await expect(page.url()).toContain('pickupCountry=IT');
+ await page.goto(path('/en/business/'));
+ await page.getByRole('link',{name:'Recurring shipments'}).click();
+ await routeAndCargo(page,'car');
+ await fillRequired(page);
+ await btn(page,'Next').click();
+ await byName(page,'flexible').check();
+ await btn(page,'Next').click();
+ await expect(byName(page,'frequency')).toBeVisible();
+ await byName(page,'frequency').fill('Monthly');
+ await byName(page,'businessPattern').selectOption('once');
+ await expect(byName(page,'frequency')).toBeHidden();
+ await fillRequired(page);
+ await btn(page,'Next').click();
+ await expect(page.locator('[data-summary]')).not.toContainText('Monthly');
+});

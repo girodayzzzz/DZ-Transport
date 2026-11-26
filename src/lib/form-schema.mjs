@@ -10,10 +10,13 @@ export const types = [
  option('moving','Selitev','Moving and relocation','Umzug und Übersiedlung'),
  option('machinery','Prevoz strojev','Machinery transport','Maschinentransport'),
  option('express','Ekspresni prevoz','Express transport','Expresstransport'),
+ option('nonRunning','Prevoz nevoznega vozila','Non-running vehicle transport','Transport nicht fahrbereiter Fahrzeuge'),
+ option('partial','Delni tovor','Partial load','Teilladung'),
+ option('full','Polni tovor','Full load','Komplettladung'),
  option('other','Drugi prevozi','Other transport','Sonstiger Transport')
 ];
 export const countries = 'AL AD AT BA BE BG BY CH CY CZ DE DK EE ES FI FR GB GR HR HU IE IS IT LI LT LU LV MC MD ME MK MT NL NO PL PT RO RS RU SE SI SK SM TR UA VA XK'.split(' ');
-export const grouping = {car:'vehicle',motorcycle:'vehicle',van:'vehicle',pallet:'pallet',cargo:'general',furniture:'moving',moving:'moving',machinery:'machinery',express:'general',other:'general'};
+export const grouping = {car:'vehicle',motorcycle:'vehicle',van:'vehicle',pallet:'pallet',cargo:'general',furniture:'moving',moving:'moving',machinery:'machinery',express:'general',nonRunning:'vehicle',partial:'general',full:'general',other:'general'};
 export const yn = [option('yes','Da','Yes','Ja'),option('no','Ne','No','Nein')];
 const yesNo = (key,labels) => field(key,labels,'select',true,yn);
 const notes = (key,labels) => field(key,labels,'textarea',false);
@@ -40,15 +43,13 @@ export const location = prefix => [
 export const cargo = {
  general:[
   field('description',['Opis tovora','Cargo description','Ladungsbeschreibung'],'textarea'),
-  integer('packages',['Število kosov','Number of packages','Anzahl der Packstücke']),
-  ...dimensions,weight,stackable,yesNo('fragile',['Krhek tovor','Fragile cargo','Zerbrechliche Güter']),loading,
+  stackable,yesNo('fragile',['Krhek tovor','Fragile cargo','Zerbrechliche Güter']),loading,
   yesNo('unloadingAssistance',['Potrebna pomoč pri razkladanju','Unloading assistance required','Entladehilfe erforderlich']),additional
  ],
  pallet:[
-  integer('palletCount',['Število palet','Pallet count','Palettenanzahl']),
   field('palletType',['Tip palete','Pallet type','Palettentyp'],'select',true,[
    option('eur','Evropaleta','Euro pallet','Europalette'),option('industrial','Industrijska','Industrial','Industriepalette'),option('other','Druga','Other','Sonstige')]),
-  ...dimensions,weight,stackable,yesNo('loadingEquipmentAvailable',['Na voljo oprema za nakladanje','Loading equipment available','Verladeausrüstung verfügbar']),
+  stackable,yesNo('loadingEquipmentAvailable',['Na voljo oprema za nakladanje','Loading equipment available','Verladeausrüstung verfügbar']),
   yesNo('tailLift',['Potrebna dvižna ploščad','Tail lift required','Ladebordwand erforderlich'])
  ],
  vehicle:[
@@ -56,6 +57,11 @@ export const cargo = {
   field('model',['Model vozila','Vehicle model','Fahrzeugmodell']),
   field('year',['Letnik','Production year','Baujahr'],'year'),
   field('vehicleType',['Tip vozila','Vehicle type','Fahrzeugtyp'],'select',true,types.slice(0,3)),
+  ...dimensions.map(item=>({...item,required:false})),
+  yesNo('rolls',['Vozilo se lahko kotali','Vehicle can roll','Fahrzeug ist rollfähig']),
+  yesNo('steers',['Krmiljenje deluje','Steering works','Lenkung funktioniert']),
+  yesNo('brakes',['Zavore delujejo','Brakes work','Bremsen funktionieren']),
+  notes('vehicleLoading',['Posebne zahteve za nakladanje','Additional loading requirements','Besondere Verladeanforderungen']),
   yesNo('running',['Vozilo je vozno','Vehicle runs','Fahrbereit']),
   notes('damage',['Poškodbe vozila','Vehicle damage','Fahrzeugschäden']),
   field('preference',['Način prevoza','Transport preference','Bevorzugte Transportart'],'select',true,[
@@ -68,11 +74,24 @@ export const cargo = {
   integer('itemCount',['Število kosov ali škatel','Number of items or boxes','Anzahl der Stücke oder Kartons']),
   field('floor',['Nadstropje (0 za pritličje)','Floor (0 for ground floor)','Etage (0 für Erdgeschoss)'],'floor'),
   yesNo('elevator',['Dvigalo je na voljo','Elevator available','Aufzug vorhanden']),loading,
+  field('deliveryFloor',['Nadstropje dostave','Delivery floor','Etage am Ziel'],'floor'),
+  yesNo('deliveryElevator',['Dvigalo na dostavi','Elevator at delivery','Aufzug am Ziel']),
+  yesNo('packing',['Potrebno pakiranje','Packing required','Verpackung benötigt']),
+  yesNo('assembly',['Potrebno sestavljanje','Assembly required','Montage benötigt']),
   yesNo('disassembly',['Potrebno razstavljanje','Disassembly required','Demontage erforderlich']),additional
  ],
  machinery:[field('machineryType',['Vrsta stroja','Machinery type','Maschinentyp']),...dimensions,weight,
   field('equipmentNeeds',['Potrebna oprema za nakladanje','Loading equipment requirements','Benötigte Verladeausrüstung'],'textarea'),additional]
 };
+export const cargoItem = [
+ integer('quantity',['Količina','Quantity','Menge']),
+ field('dimensionUnit',['Enota mer','Dimensions unit','Maßeinheit'],'select',true,[
+  option('cm','Centimetri','Centimeters','Zentimeter'),option('m','Metri','Meters','Meter')]),
+ ...dimensions.map((item,index)=>({...item,key:['length','width','height'][index],
+  labels:item.labels.map(label=>label.replace(' (cm)',''))})),
+ positive('unitWeightKg',['Masa na kos (kg)','Weight per item (kg)','Gewicht je Stück (kg)'])
+];
+export const oversized = yesNo('oversized',['Izredne mere ali masa','Oversized or overweight cargo','Übermaße oder Übergewicht']);
 export const regulated = field('regulated',['Nevaren ali reguliran tovor','Hazardous or regulated cargo','Gefährliche oder regulierte Güter'],'select',true,yn);
 export const schedule = [
  field('pickupDate',['Želeni datum prevzema','Preferred pickup date','Gewünschtes Abholdatum'],'date',false),
@@ -85,7 +104,16 @@ const email = field('email',['E-pošta','Email','E-Mail'],'email');
 const phone = field('phone',['Telefon z mednarodno predpono','Telephone with international prefix','Telefon mit internationaler Vorwahl'],'tel');
 const company = field('company',['Naziv podjetja','Company name','Firmenname']);
 const vat = field('vat',['Identifikacijska številka za DDV','VAT number','Umsatzsteuer-ID'],'text',false);
-export const companyFields = [company,vat];
+export const companyFields = [company,vat,
+ field('businessPattern',['Pogostost prevozov','Transport frequency','Transporthäufigkeit'],'select',false,[
+  option('once','Enkratno','One-time','Einmalig'),option('recurring','Redno','Recurring','Regelmäßig')])
+];
+export const recurringFields = [
+ notes('frequency',['Pričakovana pogostost','Expected frequency','Erwartete Häufigkeit']),
+ notes('typicalCargo',['Običajni tovor','Typical cargo','Typische Ladung']),
+ notes('typicalRoutes',['Običajne relacije','Typical routes','Typische Strecken']),
+ notes('monthlyVolume',['Ocenjena mesečna količina','Estimated monthly volume','Geschätztes Monatsvolumen'])
+];
 export const customer = [
  field('customerType',['Vrsta stranke','Customer type','Kundentyp'],'select',true,[
   option('private','Fizična oseba','Private customer','Privatkunde'),option('business','Podjetje','Business customer','Geschäftskunde')]),
@@ -97,6 +125,10 @@ export const customer = [
 export const partner = [
  company,field('country',['Država','Country','Land'],'country'),
  field('contact',['Kontaktna oseba','Contact person','Ansprechperson']),email,phone,vat,
+ field('registration',['Matična številka','Company registration number','Registernummer']),
+ notes('cargoDimensions',['Podprte mere tovora','Supported cargo dimensions','Unterstützte Ladungsmaße']),
+ notes('coverageType',['Domači ali mednarodni prevozi','Domestic or international coverage','Nationale oder internationale Abdeckung']),
+ notes('cooperation',['Želeni način sodelovanja','Preferred cooperation model','Bevorzugtes Kooperationsmodell']),
  field('vehicleTypes',['Tipi vozil','Vehicle types','Fahrzeugtypen']),
  field('capacity',['Prevozne zmogljivosti','Transport capacity','Transportkapazität']),
  field('coverage',['Države in regije','Countries and regions covered','Bediente Länder und Regionen']),

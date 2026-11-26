@@ -3,16 +3,16 @@ import settings from '../../config/site.json';
 import {t, booking} from '../lib/content';
 import {url} from '../lib/routes';
 import {copy, steps, pickup, delivery} from '../lib/form-copy';
-import {transport, location, cargo, regulated, schedule, customer, companyFields, partner, consents} from '../lib/form-schema.mjs';
+import {transport, location, cargo, regulated, schedule, customer, companyFields, recurringFields, cargoItem, oversized, partner, consents} from '../lib/form-schema.mjs';
 import {endpoint} from '../lib/form-core.mjs';
 import Field from './Field.astro';
 const {lang, kind} = Astro.props;
 const isPartner = kind === 'partner';
 const configured = isPartner ? settings.features.partners : settings.features.inquiries;
-const postTo = configured ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
+const postTo = configured && import.meta.env.DZ_SITE_MODE === 'production' ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
 const strings = Object.fromEntries(Object.entries(copy).map(([key,value])=>[key,t(lang,value)]));
 ---
-<form class="inquiry-form" data-workflow={kind} data-endpoint={postTo} data-confirmation={url(lang,'confirmation')} data-copy={JSON.stringify(strings)} novalidate>
+<form class="inquiry-form" method="post" data-workflow={kind} data-endpoint={postTo} data-confirmation={url(lang,'confirmation')} data-copy={JSON.stringify(strings)} novalidate>
   {!postTo && <p class="notice">{strings.unavailable}</p>}
   <noscript><p class="notice">{t(lang,['Za izpolnjevanje obrazca omogočite JavaScript.','Enable JavaScript to use this form.','Aktivieren Sie JavaScript, um das Formular zu verwenden.'])}</p></noscript>
   {!isPartner && (
@@ -39,8 +39,24 @@ const strings = Object.fromEntries(Object.entries(copy).map(([key,value])=>[key,
       <section data-step hidden>
         <h2 tabindex="-1">{t(lang,steps[2])}</h2>
         <div data-group="cargo">
-          {Object.entries(cargo).map(([category,fields])=><fieldset class="form-grid variant" data-cargo={category} hidden disabled>{fields.map(field=><Field {field} {lang} prefix={category+'-'}/>)}</fieldset>)}
-          <Field field={regulated} {lang}/>
+          {Object.entries(cargo).map(([category,fields])=><fieldset class="form-grid variant" data-cargo={category} hidden disabled>{fields.map(field=><Field {field} {lang} prefix={category+'-'}/>)}
+           {['general','pallet'].includes(category) && <div class="cargo-items">
+            <div data-items></div>
+            <template>
+             <fieldset class="form-grid cargo-item">
+              <legend>{t(lang,['Postavka tovora','Cargo item','Ladungsposition'])}</legend>
+              {cargoItem.map(field=><Field {field} {lang} prefix={category+'-item-'} value={field.key==='dimensionUnit'?'cm':''}/>)}
+              <button type="button" class="button secondary" data-remove>{t(lang,['Odstrani postavko','Remove item','Position entfernen'])}</button>
+             </fieldset>
+            </template>
+            <button type="button" class="button secondary" data-add>{t(lang,['Dodaj postavko','Add cargo item','Position hinzufügen'])}</button>
+            <dl class="cargo-totals">
+             <div><dt>{t(lang,['Skupna masa (kg)','Total weight (kg)','Gesamtgewicht (kg)'])}</dt><dd data-weight>0</dd></div>
+             <div><dt>{t(lang,['Skupna prostornina (m³)','Total volume (m³)','Gesamtvolumen (m³)'])}</dt><dd data-volume>0</dd></div>
+            </dl>
+           </div>}
+</fieldset>)}
+          <Field field={regulated} {lang}/><Field field={oversized} {lang}/>
           <p class="notice" data-regulated hidden>{strings.manual}</p>
         </div>
       </section>
@@ -49,7 +65,7 @@ const strings = Object.fromEntries(Object.entries(copy).map(([key,value])=>[key,
         <h2 tabindex="-1">{t(lang,steps[4])}</h2>
         <div data-group="customer">
           <div class="form-grid">{customer.slice(0,1).map(field=><Field {field} {lang}/>)}</div>
-          <fieldset data-company class="form-grid variant" hidden disabled>{companyFields.map(field=><Field {field} {lang}/>)}</fieldset>
+          <fieldset data-company class="form-grid variant" hidden disabled>{companyFields.map(field=><Field {field} {lang}/>)}<fieldset data-recurring class="form-grid cargo-items" hidden disabled>{recurringFields.map(field=><Field {field} {lang}/>)}</fieldset></fieldset>
           <div class="form-grid">{customer.slice(1).map(field=><Field {field} {lang}/>)}</div>
         </div>
       </section>

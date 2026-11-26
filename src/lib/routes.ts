@@ -1,9 +1,11 @@
+import {corridors} from './corridors';
 import settings from '../../config/site.json';
 
 export const languages = ['sl', 'en', 'de'] as const;
 export type Lang = typeof languages[number];
 export const services = ['vehicle','pallet','cargo','moving','express','special'] as const;
 export const slugs = {
+  germany:corridors.germany.slugs, austria:corridors.austria.slugs, italy:corridors.italy.slugs, croatia:corridors.croatia.slugs,
   home:['','',''], services:['storitve','services','leistungen'],
   vehicle:['prevoz-vozil','vehicle-transport','fahrzeugtransport'],
   pallet:['prevoz-palet','pallet-transport','palettentransport'],

@@ -1,24 +1,28 @@
-# GitHub Pages deployment
+# Deployment
 
-1. Merge reviewed changes into the `main` branch of `girodayzzzz/DZ-Transport`.
-2. In Settings → Pages, choose **GitHub Actions** under Build and deployment.
-3. In Settings → Secrets and variables → Actions → Variables, add repository variable `PAGES_DEPLOY` with value `true`. Keep it unset until the launch checks are complete.
-4. Run **Verify and deploy GitHub Pages** on `main` from the Actions tab, or push a new commit to `main`. Pull requests run checks without publishing. Use the deployment URL shown in the workflow.
-5. For the project URL, the defaults build for `https://girodayzzzz.github.io/DZ-Transport/`. Confirm the multilingual navigation, 404 page, sitemap and both forms from that URL.
+## GitHub Pages review preview
 
-## Custom domain
+1. Merge the reviewed pull request into `main`.
+2. In Settings → Pages → Build and deployment, select **GitHub Actions**.
+3. In Settings → Secrets and variables → Actions → Variables, set repository variable `PAGES_DEPLOY=true`.
+4. In Actions, run **Verify and deploy GitHub Pages** from `main`. Open the URL shown on the deploy job and check the banner, localized pages and disabled submission. The expected project URL is https://girodayzzzz.github.io/DZ-Transport/.
+5. Confirm a preview page returns HTTP 200 and contains `noindex,follow`. Crawling is allowed so crawlers can read that directive. Remove `PAGES_DEPLOY` to stop future deployment runs. Unpublish in Pages settings to take down a previously published site.
 
-1. Verify `dzautotrade.si` in the GitHub account’s Pages domain verification settings if needed.
-2. Set the Pages custom domain to `transport.dzautotrade.si`. Have the domain owner authorize and create a CNAME for `transport` pointing to `girodayzzzz.github.io`, without the repository path. This is a separate subdomain.
-3. Set the Actions variables `WEBSITE_URL=https://transport.dzautotrade.si` and `WEBSITE_BASE_PATH=/`. Rerun the workflow on `main`.
-4. Once DNS and the certificate are ready, enable **Enforce HTTPS**. Confirm canonical URLs, language alternates, sitemap, social preview and permitted form origins. Submit the new sitemap to your search provider if applicable.
+The workflow always builds in preview mode. GitHub Pages restricts using Pages to run an online business, e-commerce site or a site primarily directed at commercial transactions or commercial SaaS. Use it for review of the static implementation and use Cloudflare Pages for commercial production. [GitHub Pages usage limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits#prohibited-uses)
 
-## Reproduce the Pages build locally
+## Cloudflare Pages production
+
+1. Complete [OWNER-CONFIGURATION.md](OWNER-CONFIGURATION.md) and the [launch checklist](LAUNCH-CHECKLIST.md).
+2. Create a Cloudflare Pages project connected to this repository. Select `main`, root directory `/`, build command `npm run build` and output directory `dist`. Set `NODE_VERSION=24`.
+3. In the **Production** build environment set `DZ_SITE_MODE=production`, `SITE_URL=https://transport.dzautotrade.si`, `BASE_PATH=/` and `ASTRO_TELEMETRY_DISABLED=1`. Keep preview environments in preview mode and set their own site origin as appropriate.
+4. In Pages → Custom domains, add `transport.dzautotrade.si`. Have the domain owner authorize and perform any DNS changes Cloudflare requires. Confirm HTTPS before enabling public intake.
+5. Verify the canonical URL and sitemap use the intended host. Confirm form posts work from that origin only as intended, run the synthetic inquiries and ensure any secondary public production hostname redirects to the canonical host or is otherwise restricted.
+
+## Reproduce the project-path build
 
 ```sh
-export SITE_URL=https://girodayzzzz.github.io
-export BASE_PATH=/DZ-Transport
-export ASTRO_TELEMETRY_DISABLED=1
+export SITE_URL=https://girodayzzzz.github.io BASE_PATH=/DZ-Transport
+export DZ_SITE_MODE=preview ASTRO_TELEMETRY_DISABLED=1
 npm ci
 npm run lint
 npm test
@@ -26,3 +30,5 @@ npm run build
 npm run verify
 npm run test:browser
 ```
+
+Repeat with `SITE_URL=https://transport.dzautotrade.si BASE_PATH=/` to verify custom-domain paths in preview mode. Production mode fails the build when essential owner settings are missing.

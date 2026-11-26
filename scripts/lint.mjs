@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import config from '../config/site.json' with {type:'json'};
 import {endpoint} from '../src/lib/form-core.mjs';
-import {cargo, companyFields, consents, countries, customer, grouping, location, partner, regulated, schedule, transport, types} from '../src/lib/form-schema.mjs';
+import {cargo, cargoItem, recurringFields, oversized, companyFields, consents, countries, customer, grouping, location, partner, regulated, schedule, transport, types} from '../src/lib/form-schema.mjs';
 
 for (const path of readdirSync('.', {recursive:false})) {
  if (!path.endsWith('.mjs')) continue;
@@ -22,10 +22,10 @@ for (const directory of ['src','scripts','tests']) {
 assert.ok(config.languages.includes(config.defaultLanguage));
 assert.equal(new Set(config.languages).size,config.languages.length);
 assert.ok(config.languages.every(lang=>['sl','en','de'].includes(lang)));
-assert.ok(!config.analytics.enabled,'Implement a consent mechanism before enabling analytics');
+assert.ok(!config.analytics.enabled || (config.analytics.consentReviewed && /^[a-f0-9]{32}$/i.test(config.analytics.cloudflareToken)), 'Analytics requires an approved consent configuration and a valid Cloudflare token');
 assert.ok(Object.values(config.endpoints).every(value=>!value||endpoint(value)));
 assert.ok(!config.endpoints.inquiry || config.endpoints.inquiry!==config.endpoints.partner);
-for(const field of [transport,...location('pickup'),...location('delivery'),...Object.values(cargo).flat(),regulated,...schedule,...customer,...companyFields,...partner,...consents]) {
+for(const field of [transport,...location('pickup'),...location('delivery'),...Object.values(cargo).flat(),regulated,oversized,...cargoItem,...recurringFields,...schedule,...customer,...companyFields,...partner,...consents]) {
  assert.equal(field.labels.length,3,field.key);
  assert.ok(field.labels.every(Boolean),field.key);
  assert.ok(field.options.every(option=>option.length===4&&option.every(Boolean)),field.key);

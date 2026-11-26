@@ -7,8 +7,8 @@ A static, multilingual transport inquiry site for Slovenia and Europe. DZ Transp
 | Site | Astro 5, TypeScript and CSS with static HTML |
 | Languages | Slovenian at the site root, English under `/en/`, German under `/de/` |
 | Forms | Six-step inquiry and separate partner application, each with a configurable HTTPS endpoint |
-| Hosting | GitHub Pages with repository-path and custom-domain builds |
-| Data | No application database or analytics scripts |
+| Hosting | GitHub Pages review preview and Cloudflare Pages production |
+| Data | No application database. Optional Cloudflare Web Analytics is off by default. |
 
 ## Run locally
 
@@ -41,9 +41,9 @@ npm run test:browser
 - `src/styles/site.css` defines the design system and responsive layout.
 - `scripts/`, `tests/`, and `.github/workflows/pages.yml` contain checks and deployment automation.
 
-The site includes the homepage, service overview and six service details, transport inquiry, business and partner pages, process, FAQ, about, contact, privacy, terms, cookies, confirmation and custom 404. Each page type has three language variants.
+The site includes the homepage, service overview, six service details and four European corridors, transport inquiry, business and partner pages, process, FAQ, about, contact, privacy, terms, cookies, confirmation and custom 404. Each page type has three language variants.
 
-[Set up forms and configuration](SETUP.md) · [Deploy to GitHub Pages](DEPLOYMENT.md) · [Review launch checklist](LAUNCH-CHECKLIST.md) · [Security](SECURITY.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
+[Set up forms and configuration](SETUP.md) · [Preview and production deployment](DEPLOYMENT.md) · [Review launch checklist](LAUNCH-CHECKLIST.md) · [Security](SECURITY.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
 
 ## Assets
 
@@ -57,3 +57,9 @@ The favicon and wordmark are original temporary artwork. Photography is illustra
 - Logistics yard [Unsplash](https://images.unsplash.com/photo-1565793298595-6a879b1d9492)
 - Metalworking [Unsplash](https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122)
 - Coverage illustration uses public-domain country outlines from [Natural Earth](https://www.naturalearthdata.com/about/terms-of-use/). Dotted paths illustrate possible European connections.
+
+## V2 launch configuration
+
+The default build is a noindex preview with both submissions disabled. Start with [OWNER-CONFIGURATION.md](OWNER-CONFIGURATION.md), then follow [DEPLOYMENT.md](DEPLOYMENT.md). The [private management specification](docs/DZ-TRANSPORT-MANAGER.md) covers future intake, dispatch, reporting and CRM integration.
+
+The service cards and service headers use 420 px and 800 px WebP variants of the same licensed source images. The corresponding original JPEGs are used for social sharing. The existing DZ Transport wordmark remains provisional.

@@ -1,6 +1,7 @@
 ---
 import '../styles/site.css';
 import company from '../../config/site.json';
+import {legalPages} from '../lib/site-config.mjs';
 import {titles,intro,t,faq} from '../lib/content';
 import {asset,absolute,enabledLanguages,defaultLanguage,url,services,type Page,type Lang} from '../lib/routes';
 const {page,lang} = Astro.props as {page:Page,lang:Lang};
@@ -30,7 +31,10 @@ const navGroups=[
  {label:t(lang,['Informacije','Information','Informationen']),pages:['process','faq','about','contact'] as Page[]}
 ];
 const footerGroups=[['services','vehicle','pallet','cargo','moving','express','special'],['process','business','partners','faq','about','contact'],['privacy','terms','cookies']] as Page[][];
-const noindex=['missing','confirmation'].includes(page);
+const preview=import.meta.env.DZ_SITE_MODE !== 'production';
+const analyticsToken=!preview && company.analytics.enabled && company.analytics.consentReviewed && /^[a-f0-9]{32}$/i.test(company.analytics.cloudflareToken)
+ && !['inquiry','partners','confirmation','missing'].includes(page) ? company.analytics.cloudflareToken : '';
+const noindex=preview || ['missing','confirmation',...legalPages].includes(page);
 ---
 <!doctype html>
 <html lang={lang}>
@@ -46,13 +50,24 @@ const noindex=['missing','confirmation'].includes(page);
  <meta property="og:type" content="website"/><meta property="og:title" content={title}/>
  <meta property="og:description" content={description}/><meta property="og:url" content={canonical}/>
  <meta property="og:site_name" content={company.name}/><meta property="og:locale" content={loc[lang]}/>
- <meta property="og:image" content={absolute(asset('images/road.jpg'),Astro.site)}/>
+ <meta property="og:image" content={absolute(asset('images/'+(({vehicle:'vehicle.jpg',pallet:'pallet.jpg',cargo:'cargo.jpg',moving:'moving.jpg',express:'express.jpg',special:'special.jpg'} as Record<string,string>)[page] || 'road.jpg')),Astro.site)}/>
  <meta name="twitter:card" content="summary_large_image"/>
- <link rel="icon" href={asset('favicon.svg')} type="image/svg+xml"/>
+ {analyticsToken && <script is:inline define:vars={{analyticsToken}}>
+  if (!location.search && !location.hash) {
+   const beacon=document.createElement('script');
+   beacon.src='https://static.cloudflareinsights.com/beacon.min.js';
+   beacon.defer=true;
+   beacon.referrerPolicy='no-referrer';
+   beacon.dataset.cfBeacon=JSON.stringify({token:analyticsToken,spa:false});
+   document.head.append(beacon);
+  }
+ </script>}
+ <link rel="icon"  href={asset('favicon.svg')} type="image/svg+xml"/>
  {!noindex && <script type="application/ld+json" set:html={JSON.stringify({'@context':'https://schema.org','@graph':schema}).replace(/</g,'\\u003c')}/>}
 </head>
 <body>
  <a class="skip" href="#main">{t(lang,['Preskoči na vsebino','Skip to content','Zum Inhalt springen'])}</a>
+ {preview && <p class="preview-status">{t(lang,['Predogled · oddaja obrazcev je izključena','Preview · form submission is disabled','Vorschau · Formularversand ist deaktiviert'])}</p>}
  <header class="header">
   <div class="topline"><div class="wrap"><span>{t(lang,['Slovenija in Evropa','Slovenia and Europe','Slowenien und Europa'])}</span><a href={company.parentUrl}>DZ Auto Trade</a>{socials.map(([name,href])=><a href={href}>{name}</a>)}</div></div>
   <div class="wrap header-row">
@@ -85,7 +100,7 @@ const noindex=['missing','confirmation'].includes(page);
   </div>
   <div class="wrap copyright">© {new Date().getFullYear()} DZ Transport</div>
  </footer>
- {page!=='inquiry' && <a class="button primary mobile-quote" href={url(lang,'inquiry')}>{quote}</a>}
+ {!['inquiry','partners'].includes(page) && <a class="button primary mobile-quote" href={url(lang,'inquiry')}>{quote}</a>}
  <script>
   const quick=document.querySelector('[data-quick]');
   const mobileQuote=document.querySelector('.mobile-quote');

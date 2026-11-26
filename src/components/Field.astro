@@ -11,7 +11,7 @@ const countryOptions = countries.map((code:string) => [code,regions.of(code)]).s
 const choices = type === 'country' ? countryOptions : options.map((option:string[])=>[option[0],option[position(lang)+1]]);
 const numeric = ['number','integer','year','floor'].includes(type);
 const minimum = type === 'year' ? 1886 : type === 'floor' ? -20 : type === 'number' ? 0.01 : 1;
-const maximum = type === 'year' ? new Date().getFullYear()+1 : type === 'floor' ? 200 : undefined;
+const maximum = type === 'year' ? new Date().getFullYear()+1 : type === 'floor' ? 200 : numeric ? 1_000_000 : undefined;
 const auto:Record<string,string> = {name:'name',contact:'name',company:'organization',email:'email',phone:'tel'};
 ---
 <div class:list={['field',type==='textarea'&&'wide',type==='checkbox'&&'check']}>

@@ -7,3 +7,7 @@ The site renders review entries with text nodes, keeps personal entries in the a
 HTML and client-side validation provide user feedback. Anyone can call a public form endpoint directly. Use provider-side rate limits, spam checks and validation. The honeypot and submission lock reduce accidental and simple automated submissions. A lost response can leave acceptance uncertain. Check the reference before processing a repeat, or enforce idempotency through a future server-side gateway. The local reference does not prove acceptance or identify a booking.
 
 GitHub Pages is static. It does not provide application-side access controls or configurable application response headers. Review processor terms, access controls, data transfers, notifications and retention. Use separate provider accounts or roles for staff, enable MFA and review access periodically.
+
+## Intake receipts and retries
+
+Production sends to distinct public HTTPS endpoints with credentials omitted. Confirmation requires a positive JSON receipt. The browser reuses a reference for an unchanged retry. Authoritative deduplication belongs to the provider or private intake API. See [DZ Transport Manager](docs/DZ-TRANSPORT-MANAGER.md) for the proposed transaction and receipt contract.

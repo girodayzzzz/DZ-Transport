@@ -1,5 +1,12 @@
 # Changelog
 
+## V2 (unreleased)
+
+- Added a default noindex preview and validated production mode with explicit legal approval.
+- Added 13 inquiry categories, multi-item cargo calculations, localized route pages and recurring business intake.
+- Tightened provider receipt verification and added explicit partner, cargo and manual-review details.
+- Documented Cloudflare Pages production hosting and the future private management application.
+
 ## 1.0.0
 
 - Added the localized static website, service pages, business and partner pages and legal drafts.
