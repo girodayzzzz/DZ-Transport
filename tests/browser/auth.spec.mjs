@@ -16,9 +16,10 @@ const user={id:'cccccccc-cccc-4ccc-bccc-cccccccccccc',email:'customer@example.in
  email_confirmed_at:'2026-11-26T12:00:00Z',app_metadata:{},user_metadata:{},aud:'authenticated'};
 const secret='synthetic-test-password';
 
-async function setup(page,{onboarding=false,google=false}={}) {
- const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google,onboarding},labels,links});
+async function setup(page,{onboarding=false,google=false,quickDeal=false}={}) {
+ const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google,onboarding,quickDeal},labels,links});
  let profile=null;
+ let requestedDeal=false;
  const calls=[];
  await page.route(origin+'/**',async route=>{
   const url=new URL(route.request().url());
@@ -51,6 +52,19 @@ async function setup(page,{onboarding=false,google=false}={}) {
    contentType:'text/html',
    body:'<a href="'+origin+links.callback+'?code=synthetic-oauth-code">Approve fixture consent</a>'
   });
+  if(quickDeal && url.pathname==='/rest/v1/partner_applications') return respond([{id:'application',state:'approved'}]);
+  if(quickDeal && url.pathname.endsWith('/rpc/list_quick_deals')) {
+   return respond([{
+    id:'fixture-deal',reference:'Fixture transport',cargo_category:'Pallets',pickup_region:'SI',delivery_region:'DE',
+    status:requestedDeal?'acceptance_requested':'available',has_requested:requestedDeal,carrier_minor:45000,currency:'EUR',
+    expires_at:'2026-12-03T12:00:00Z',pickup_window:'[2026-12-01,2026-12-03)',
+    delivery_window:'[2026-12-04,2026-12-05)',vehicle_requirements:'Box van',weight_kg:700
+   }]);
+  }
+  if(quickDeal && url.pathname.endsWith('/rpc/request_quick_deal')) {
+   requestedDeal=true;
+   return route.fulfill({status:204,headers});
+  }
   if(url.pathname==='/rest/v1/profiles') return respond(profile ? [profile] : []);
   if(url.pathname.endsWith('/rpc/choose_customer_account_type')) {
    profile={account_type:data.p_type,display_name:'',onboarding_completed_at:null};
@@ -147,4 +161,27 @@ test('Google registration shares resumable business customer onboarding',async({
  await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toBeVisible();
  expect(calls.find(call=>call.path.endsWith('/complete_free_customer_onboarding')).data)
   .toEqual({p_name:'Synthetic Customer',p_business_name:'Synthetic Transport Buyer'});
+});
+
+test('eligible carrier filters and requests a Quick Deal',async({page})=>{
+ const {calls,open}=await setup(page,{quickDeal:true});
+ await page.setViewportSize({width:390,height:844});
+ await open('login');
+ await page.getByLabel('Email',{exact:true}).fill(user.email);
+ await page.getByLabel('Password',{exact:true}).fill(secret);
+ await page.getByRole('button',{name:'Sign in',exact:true}).click();
+ await expect(page).toHaveURL(origin+links.customer);
+ await open('carrier');
+ const deals=page.locator('article').filter({has:page.getByRole('heading',{name:labels.quickDeals})});
+ await expect(deals.getByText('Fixture transport')).toBeVisible();
+ await deals.getByRole('combobox',{name:labels.status,exact:true}).selectOption('reserved');
+ await deals.getByRole('button',{name:labels.search,exact:true}).click();
+ await expect(deals.getByText('Fixture transport')).toHaveCount(0);
+ await deals.getByRole('combobox',{name:labels.status,exact:true}).selectOption('all');
+ await deals.getByRole('button',{name:labels.search,exact:true}).click();
+ await deals.locator('summary').filter({hasText:labels.quickDealRequest}).click();
+ await deals.getByRole('button',{name:labels.quickDealRequest,exact:true}).click();
+ await expect(deals.getByRole('cell',{name:labels.acceptance_requested})).toBeVisible();
+ expect(calls.find(call=>call.path.endsWith('/request_quick_deal')).data).toEqual({p_deal:'fixture-deal'});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

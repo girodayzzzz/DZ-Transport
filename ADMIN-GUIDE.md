@@ -10,3 +10,7 @@ Verify the owner-controlled account’s email and complete the authenticator cha
 6. Verify licences, insurance, company identity and service coverage before approving a partner. Use suspension to revoke access immediately. Review deletion requests and apply approved retention and legal holds.
 
 Use the Manager list’s search and status filters for recent records. An expired offer requires manual resolution. The status workflow allows cancellation but currently has no self-service re-quotation or reassignment flow.
+
+## Quick Deal
+
+See the [manager workflow](QUICK-DEAL.md#manager-and-carrier-workflow) for drafting, eligibility, reservation, award and cancellation.

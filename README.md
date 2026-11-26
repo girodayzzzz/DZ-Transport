@@ -4,11 +4,13 @@ A static, multilingual transport inquiry site for Slovenia and Europe. DZ Transp
 
 | Area | Implementation |
 | --- | --- |
-| Site | Astro 5, TypeScript and CSS with static HTML |
+| Site | Astro 7, TypeScript and CSS with static HTML |
 | Languages | Slovenian at the site root, English under `/en/`, German under `/de/` |
 | Forms | Six-step inquiry and separate partner application, each with a configurable HTTPS endpoint |
 | Hosting | GitHub Pages review preview and Cloudflare Pages production |
-| Data | No application database. Optional Cloudflare Web Analytics is off by default. |
+| Data | Supabase backs the optional authenticated portal and private transport workflows. |
+
+See the [V5 delivery matrix](docs/V5-DELIVERY.md) and [Quick Deal setup](QUICK-DEAL.md).
 
 ## Run locally
 

@@ -1,12 +1,12 @@
 import {createClient} from '@supabase/supabase-js';
 import {mountDashboard} from './portal-dashboard';
 
-export type Field = {name:string; label:string; type?:string; min?:number; max?:number; value?:string;
+export type Field = {name:string; label:string; type?:string; min?:number; max?:number; step?:number; value?:string;
  options?:[string,string][]; autocomplete?:string; optional?:boolean};
 
 export async function mountPortal(root:HTMLElement) {
  const {configuration,labels,links}=JSON.parse(root.dataset.init!) as {
-  configuration:{url:string;key:string;google:boolean;onboarding?:boolean};
+  configuration:{url:string;key:string;google:boolean;onboarding?:boolean;quickDeal?:boolean};
   labels:Record<string,string>;
   links:Record<string,string>;
  };
@@ -41,7 +41,7 @@ export async function mountPortal(root:HTMLElement) {
     if (field.autocomplete) input.setAttribute('autocomplete',field.autocomplete);
     if(field.name==='code') {input.inputMode='numeric';input.pattern='[0-9]{6}';}
     if(input.type==='number') {
-     input.step='1';
+     input.step=String(field.step ?? 1);
      input.min=String(field.min ?? 0);
      input.max=String(field.max ?? 1000000000);
     }
@@ -262,7 +262,7 @@ export async function mountPortal(root:HTMLElement) {
      return;
     }
    }
-   await mountDashboard({client,page,body,labels,form,show,el,unwrap,userId:user.id});
+   await mountDashboard({client,page,body,labels,form,show,el,unwrap,userId:user.id,quickDeal:configuration.quickDeal});
   }
  } catch {
   show(labels.error);

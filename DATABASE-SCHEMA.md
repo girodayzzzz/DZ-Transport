@@ -23,3 +23,7 @@ Archiving is reversible operationally through trusted SQL. The private purge fun
 Migration `202611260005_customer_onboarding.sql` adds customer classification, registered business name when applicable and a completion timestamp to `profiles`. Existing profiles keep null onboarding columns until the customer enrolls. The V3 profile RLS remains in place. Confirmed users can choose an account classification and complete free onboarding through owner-scoped RPCs. The RPCs leave role grants and partner approval independent. Completion is retry-safe and the selected classification is locked after completion.
 
 For application rollback, disable `PUBLIC_DZ_CUSTOMER_ONBOARDING` and rebuild. The migration is additive and can remain applied with the existing application. Preserve recorded classifications in backups before considering any later schema removal.
+
+## Quick Deal
+
+Migration 006 centralizes assignment under an inquiry and carrier role lock. Migration 007 adds `dz_private.quick_deal_settings`, `quick_deals` and `quick_deal_candidates`. The inquiry foreign key is unique and candidates are unique per deal and carrier. All tables use RLS with direct access revoked. Public RPCs authorize and project the workflow. The [Quick Deal guide](QUICK-DEAL.md) describes reservation expiry and the carrier-visible fields.

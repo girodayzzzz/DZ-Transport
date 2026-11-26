@@ -1,4 +1,9 @@
 # Changelog
+
+## V5 review
+
+- Audit merged V4 and stabilize private order assignment and carrier notification.
+- Add guarded manual Quick Deal drafting, publication, eligibility, acceptance requests, reservation, and award in the carrier and manager portals.
 ## V4 foundation
 
 - Add flagged, resumable private and business customer onboarding and cardless activation.
