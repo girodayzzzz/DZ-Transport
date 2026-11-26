@@ -44,6 +44,8 @@ export const cargo = {
  general:[
   field('description',['Opis tovora','Cargo description','Ladungsbeschreibung'],'textarea'),
   stackable,yesNo('fragile',['Krhek tovor','Fragile cargo','Zerbrechliche Güter']),loading,
+  yesNo('loadingEquipmentAvailable',['Na voljo oprema za nakladanje','Loading equipment available','Verladeausrüstung verfügbar']),
+  yesNo('tailLift',['Potrebna dvižna ploščad','Tail lift required','Ladebordwand erforderlich']),
   yesNo('unloadingAssistance',['Potrebna pomoč pri razkladanju','Unloading assistance required','Entladehilfe erforderlich']),additional
  ],
  pallet:[
@@ -81,7 +83,8 @@ export const cargo = {
   yesNo('disassembly',['Potrebno razstavljanje','Disassembly required','Demontage erforderlich']),additional
  ],
  machinery:[field('machineryType',['Vrsta stroja','Machinery type','Maschinentyp']),...dimensions,weight,
-  field('equipmentNeeds',['Potrebna oprema za nakladanje','Loading equipment requirements','Benötigte Verladeausrüstung'],'textarea'),additional]
+  field('equipmentNeeds',['Potrebna oprema za nakladanje','Loading equipment requirements','Benötigte Verladeausrüstung'],'textarea'),
+  notes('specialHandling',['Posebne zahteve za ravnanje','Special handling requirements','Besondere Handhabungsanforderungen']),additional]
 };
 export const cargoItem = [
  integer('quantity',['Količina','Quantity','Menge']),
