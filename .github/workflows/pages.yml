@@ -16,8 +16,8 @@ jobs:
     env:
       DZ_SITE_MODE: preview
       ASTRO_TELEMETRY_DISABLED: '1'
-      SITE_URL: ${{ vars.WEBSITE_URL || format('https://{0}.github.io', github.repository_owner) }}
-      BASE_PATH: ${{ vars.WEBSITE_BASE_PATH || format('/{0}', github.event.repository.name) }}
+      SITE_URL: ${{ format('https://{0}.github.io', github.repository_owner) }}
+      BASE_PATH: ${{ format('/{0}', github.event.repository.name) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -72,3 +72,42 @@ jobs:
     steps:
       - uses: actions/deploy-pages@v4
         id: deployment
+      - name: Verify deployed preview safeguards
+        env:
+          PREVIEW_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          for route in '' 'en/' 'de/' 'en/inquiry/' 'en/partners/' 'en/login/'; do
+            curl --fail --silent --show-error --retry 5 --retry-all-errors "${PREVIEW_URL%/}/${route}" -o /tmp/dz-deployed.html
+            grep -q 'name="robots" content="noindex,follow"' /tmp/dz-deployed.html
+            grep -q 'class="preview-status"' /tmp/dz-deployed.html
+            if grep -Eq 'data-endpoint="https?://|data-init=' /tmp/dz-deployed.html; then
+              exit 1
+            fi
+          done
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: isolated_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: isolated_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply migrations and test permissions in PostgreSQL
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/database/bootstrap.sql
+          for migration in supabase/migrations/*.sql; do
+            psql -v ON_ERROR_STOP=1 -f "$migration"
+          done
+          psql -v ON_ERROR_STOP=1 -f tests/database/policies.sql

@@ -1,7 +1,9 @@
+import {portalTitles} from './portal-copy';
 import {corridors} from './corridors';
 import { localized, type Lang, type Page } from './routes';
 
 export const titles: Record<Page,string[]> = {
+ ...portalTitles,
  germany:corridors.germany.title,
  austria:corridors.austria.title,
  italy:corridors.italy.title,
@@ -29,6 +31,7 @@ export const titles: Record<Page,string[]> = {
 };
 
 export const intro: Record<Page,string[]> = {
+ ...portalTitles,
  germany:corridors.germany.intro,
  austria:corridors.austria.intro,
  italy:corridors.italy.intro,

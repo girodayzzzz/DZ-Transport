@@ -1,0 +1,106 @@
+import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+import {portalCopy,portalTitles,statusLabels} from '../../src/lib/portal-copy.ts';
+
+const origin='https://portal-test.invalid';
+const project='https://dz-fixture.supabase.co';
+const base=(process.env.BASE_PATH||'/').replace(/\/$/,'');
+const routes={
+ login:'login',register:'register',forgot:'forgot-password',reset:'reset-password',verify:'verify-email',
+ callback:'auth-callback',account:'account',logout:'logout',deletion:'account-deletion',customer:'customer-portal',
+ carrier:'partner-portal',manager:'transport-manager'
+};
+const links=Object.fromEntries(Object.entries(routes).map(([key,path])=>[key,base+'/en/'+path+'/']));
+const labels=Object.fromEntries(Object.entries({...portalCopy,...portalTitles,...statusLabels}).map(([key,values])=>[key,values[1]]));
+const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google:false},labels,links});
+const user={id:'cccccccc-cccc-4ccc-bccc-cccccccccccc',email:'customer@example.invalid',
+ email_confirmed_at:'2026-11-26T12:00:00Z',app_metadata:{},user_metadata:{},aud:'authenticated'};
+const secret='synthetic-test-password';
+
+async function setup(page) {
+ const calls=[];
+ await page.route(origin+'/**',async route=>{
+  const url=new URL(route.request().url());
+  const relative=url.pathname.slice(base.length).replace(/^\//,'');
+  if(!/^(_astro\/[^/]+\.(js|css)|en\/[a-z-]+\/)$/.test(relative)) return route.fulfill({status:404});
+  const file=await readFile('dist/'+relative+(relative.endsWith('/')?'index.html':''),'utf8');
+  if(relative.endsWith('/')) {
+   const escaped=init.replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;');
+   const body=file.replace(/(data-portal="[a-z-]+")([^>]*>)/,
+    '$1 data-init="'+escaped+'"$2<p role="status" data-portal-status></p><div data-portal-body></div>');
+   return route.fulfill({body,contentType:'text/html'});
+  }
+  return route.fulfill({body:file,contentType:relative.endsWith('.css')?'text/css':'text/javascript'});
+ });
+ await page.route(project+'/**',async route=>{
+  const request=route.request();
+  const url=new URL(request.url());
+  const headers={
+   'access-control-allow-origin':origin,
+   'access-control-allow-methods':'GET,POST,PUT,OPTIONS',
+   'access-control-allow-headers':request.headers()['access-control-request-headers'] || '*'
+  };
+  if(request.method()==='OPTIONS') return route.fulfill({status:204,headers});
+  const data=request.postDataJSON();
+  calls.push({path:url.pathname,search:url.search,data});
+  const respond=(json,status=200)=>route.fulfill({status,headers,json});
+  const session={access_token:'fixture-access-token',refresh_token:'fixture-refresh-token',
+   token_type:'bearer',expires_in:3600,user};
+  if(url.pathname==='/auth/v1/signup') return respond({user,session:null});
+  if(url.pathname==='/auth/v1/recover') return respond({});
+  if(url.pathname==='/auth/v1/verify') return respond(session);
+  if(url.pathname==='/auth/v1/token') {
+   return url.searchParams.get('grant_type')==='refresh_token'
+    ? respond({message:'Refresh token invalid',error_code:'refresh_token_not_found'},400) : respond(session);
+  }
+  if(url.pathname==='/auth/v1/user') return respond(user);
+  if(url.pathname==='/auth/v1/logout') return route.fulfill({status:204,headers});
+  if(url.pathname.startsWith('/rest/v1/')) return respond([]);
+  return respond({},404);
+ });
+ return {calls,open:key=>page.goto(origin+links[key])};
+}
+
+test('registration, email confirmation, sign-out and ordinary login',async({page})=>{
+ const {calls,open}=await setup(page);
+ await open('register');
+ await page.getByLabel('Email',{exact:true}).fill(user.email);
+ await page.getByLabel('Password',{exact:true}).fill(secret);
+ await page.getByRole('button',{name:'Register',exact:true}).click();
+ await expect(page.locator('[data-portal-status]')).toHaveText(labels.mailSent);
+ expect(calls.find(call=>call.path.endsWith('/signup')).search).toContain(encodeURIComponent(origin+links.verify));
+ await page.goto(origin+links.verify+'#token_hash=fixture-email&type=email');
+ await expect(page).toHaveURL(origin+links.customer);
+ await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toBeVisible();
+ await open('logout');
+ await page.getByRole('button',{name:'Sign out',exact:true}).click();
+ await expect(page).toHaveURL(origin+links.login);
+ await page.getByLabel('Email',{exact:true}).fill(user.email);
+ await page.getByLabel('Password',{exact:true}).fill(secret);
+ await page.getByRole('button',{name:'Sign in',exact:true}).click();
+ await expect(page).toHaveURL(origin+links.customer);
+ await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toBeVisible();
+});
+
+test('password recovery and a refused expired session',async({page})=>{
+ const {calls,open}=await setup(page);
+ await open('forgot');
+ await page.getByLabel('Email',{exact:true}).fill(user.email);
+ await page.getByRole('button',{name:'Submit',exact:true}).click();
+ await expect(page.locator('[data-portal-status]')).toHaveText(labels.mailSent);
+ await page.goto(origin+links.verify+'#token_hash=fixture-recovery&type=recovery');
+ await expect(page).toHaveURL(origin+links.reset);
+ await page.getByLabel('Password',{exact:true}).fill(secret);
+ await page.getByRole('button',{name:'Save',exact:true}).click();
+ await expect(page).toHaveURL(origin+links.login);
+ expect(calls.some(call=>call.path.endsWith('/user') && call.data?.password===secret)).toBeTruthy();
+ await page.evaluate(user=>{
+  sessionStorage.setItem('sb-dz-fixture-auth-token',JSON.stringify({
+   user,access_token:'expired',refresh_token:'expired',expires_in:1,expires_at:1,token_type:'bearer'
+  }));
+ },user);
+ await open('customer');
+ await expect(page.locator('[data-portal-status]')).toHaveText(labels.authRequired);
+ expect(calls.some(call=>call.search.includes('grant_type=refresh_token'))).toBeTruthy();
+ await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toHaveCount(0);
+});
