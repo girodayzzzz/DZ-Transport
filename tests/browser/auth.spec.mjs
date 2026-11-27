@@ -334,6 +334,7 @@ test('confirmation works in a new browser context and invalid links offer generi
 
   await open('verify','#token_hash=fixture-email&type=email');
   await expect(other.locator('[data-portal-status]')).toHaveText(labels.linkUnavailable);
+  await open('login');
   await open('verify','#token_hash=fixture-expired&type=email');
   await expect(other.locator('[data-portal-status]')).toHaveText(labels.linkUnavailable);
   await expect(other).toHaveURL(origin+links.verify);
