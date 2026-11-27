@@ -1,0 +1,36 @@
+# Closed pilot
+
+The pilot exercises the existing no-payment offer and assignment workflow with synthetic data. It requires Cloudflare Access in addition to Supabase Auth. Verify the Access policy before enabling interactive endpoints. Supabase row-level security and the administrator MFA requirement apply within the pilot.
+
+## Cloudflare and Supabase setup
+
+1. In the existing `dz-transport` Pages project, verify the repository, production branch `main`, and its public `DZ_SITE_MODE=preview` setting. For the pilot, allow the review branch `codex/closed-pilot` in preview branch controls. Enable Pages preview access in Settings → General and limit the Access policy to authorized testers. Verify in a signed-out browser that both the branch alias and commit-specific preview are gated, including form API paths. An unlisted URL or a noindex directive does not secure the pilot. [Cloudflare Pages preview access](https://developers.cloudflare.com/pages/configuration/preview-deployments/#customize-preview-deployments-access)
+2. Copy the stable branch alias from the resulting deployment. The code expects `https://codex-closed-pilot.dz-transport.pages.dev` for this branch. Use it as `SITE_URL` and `DZ_SITE_ORIGIN` in the **Preview** scope. Use `BASE_PATH=/`, `NODE_VERSION=24`, `DZ_SITE_MODE=pilot`. Pages injects `CF_PAGES` and `CF_PAGES_BRANCH` automatically. The build checks the branch and origin. The production mode still requires all approved legal settings.
+3. Reuse the authorized DZ Transport Supabase project. Verify migration history through 011 and compare `PUBLIC_SUPABASE_URL` and `SUPABASE_URL` with that project. In Preview configure `PUBLIC_SUPABASE_PUBLISHABLE_KEY` and the protected `SUPABASE_SECRET_KEY`. Set `PUBLIC_DZ_PORTAL`, `PUBLIC_DZ_MANAGER`, `PUBLIC_DZ_PARTNER` to `true`. Set both build flags `PUBLIC_DZ_GUEST_INTAKE` and `PUBLIC_DZ_GUEST_PARTNER_INTAKE`, plus runtime flags `DZ_GUEST_INTAKE` and `DZ_GUEST_PARTNER_INTAKE`, to `true`. Set the public Turnstile key, its matching protected secret and the protected network-hash secret. Verify the widget allows the exact alias hostname. Use the alias consistently for Auth and form submissions. [Pages setup](../CLOUDFLARE-PAGES-SETUP.md)
+4. Verify the existing Supabase Site URL and add the pilot alias with each existing locale's exact confirmation and recovery path to the redirect allowlist. Keep the existing Site URL if it is already correct. Verify each template uses the supplied redirect, check SMTP sender configuration, and verify delivery to an authorized test mailbox. Avoid recording auth links, session data and secrets in the test notes. [Auth and redirect paths](../SUPABASE-SETUP.md#configure-urls-and-mail)
+5. Keep `DZ_STRIPE_TEST=false` for this pilot and verify the database payment flag is already off using the read-only `select public.v8_available();`. If it is on, use an authorized test database with V8 disabled for the no-payment acceptance scenario. Keep Quick Deal out of this pilot. Leave the public Pages site and DNS as configured.
+
+## Hosted walkthrough
+
+| Step | Synthetic acceptance check |
+| --- | --- |
+| Access and device | Test the alias and API without Access, then sign in as an allowed tester. Repeat key public, Auth and portal screens on mobile in SL, EN and DE. |
+| Auth | Register a test customer, receive and use the confirmation mail, sign in, request a reset and confirm the new credentials work. Record provider delivery separately from UI results. |
+| Guest intake | Submit a car inquiry Murska Sobota → Maribor and a distinct carrier application. Compare both browser references to the manager details and restricted database records. Verify the application is pending and created no carrier role. |
+| Account-owned transport | Submit a second inquiry in the customer's signed-in portal for the same route so it belongs to that account. Guest inquiries have no account owner and use the existing guest acceptance workflow. |
+| Offer and assignment | As an approved administrator with MFA, advance the account inquiry and invite the approved carrier. The carrier submits the bid. The manager prepares and sends the customer-facing offer using the carrier quote, the customer accepts, and the manager assigns the carrier after applicable fee terms are recorded and confirmed. Check that only assignment opens the conversation. |
+| Chat and roles | Send a message in each direction. An unrelated user must see neither offers nor chat, and an ordinary user and an administrator at AAL1 must be denied management functions. |
+| Evidence | Record the verified preview URL, commit, reference comparison, authorization outcomes, languages and device. Remove synthetic records according to the authorized test cleanup procedure. |
+
+## Decisions still needed before launch
+
+- Finalize retention schedules or criteria for accounts, guest records, carrier applications, offers, chat, logs, backups and financial records. Confirm legal bases, mandatory fields and whether marketing is used.
+- Confirm contract and data protection roles for carriers, Cloudflare and Turnstile, Supabase, SMTP and Stripe, including regions, subprocessors and transfer safeguards.
+- Confirm when orders become binding, the authorization to collect for the carrier and discharge of the customer's debt, precontract and withdrawal disclosures, VAT and invoice corrections, cancellation fees, refund triggers, timing and responsibility, chargebacks, complaints, insurance and damage claims.
+- Record the actual approval after review of all three language versions. [Production review](PRODUCTION-READINESS.md)
+
+## Separate payments PR
+
+Keep carrier-as-supplier terms and a separate DZ Transport commission invoice. For a known carrier, resolve the authorized connected account on the server before Checkout, validate its payment capabilities, and verify the applicable Connect configuration to identify it at payment. For separate charges and transfers, evaluate `payment_intent_data[on_behalf_of]` with the carrier's connected account. Align pre-acceptance seller disclosure, Checkout, statement, receipts and invoices. Preserve idempotency, payment webhooks and controlled release after confirmed delivery. Test refunds, transfer reversals and disputes with sandbox credentials. [Stripe merchant of record](https://docs.stripe.com/connect/merchant-of-record)
+
+For Quick Deal, the carrier is unknown at publication. Evaluate publishing the fixed price without charging, reserving the winning carrier, showing it to the customer and then creating Checkout. Cover reservation expiry, declined or late payment, failed onboarding, duplicate acceptances and cancellation. Close an unmatched listing without a charge. A later transfer cannot retroactively set the merchant on the original charge.

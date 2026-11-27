@@ -1,5 +1,5 @@
 ---
-import {isProduction} from '../lib/site-config.mjs';
+import {interactive,isProduction} from '../lib/site-config.mjs';
 import {corridors} from '../lib/corridors';
 import settings from '../../config/site.json';
 import {intro,t,titles,faq,process,booking,serviceDetails} from '../lib/content';
@@ -25,7 +25,7 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
    <div class="wrap">
     <div>
      <p class="eyebrow"><span></span>{page==='missing'?'404':selected?t(lang,titles.services):'DZ TRANSPORT'}</p>
-     <h1>{t(lang,titles[page])}</h1><p>{page==='confirmation' && !isProduction ? t(lang,['Na tem predogledu je oddaja obrazcev izključena.','Form submission is disabled on this preview.','In dieser Vorschau ist der Formularversand deaktiviert.']) : t(lang,intro[page])}</p>
+     <h1>{t(lang,titles[page])}</h1><p>{page==='confirmation' && !interactive ? t(lang,['Na tem predogledu je oddaja obrazcev izključena.','Form submission is disabled on this preview.','In dieser Vorschau ist der Formularversand deaktiviert.']) : t(lang,intro[page])}</p>
      {selected && <a class="button primary" href={url(lang,'inquiry')+'?transportCategory='+selected+(page==='express'?'&urgent=1':'')}>{quote}</a>}
     </div>
     {selected && <img src={asset('images/'+page+'-800.webp')}

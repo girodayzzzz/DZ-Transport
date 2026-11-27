@@ -123,11 +123,20 @@ begin
  then raise exception 'Carrier chat or retry incorrect'; end if;
 end $$;
 select public.mark_notification_read(id) from public.notifications where event='transport_message';
+select public.send_transport_message(:'chat','77200000-0000-0000-0000-000000000003','Synthetic carrier reply');
+set local request.jwt.claims='{"sub":"77000000-0000-0000-0000-000000000001","aal":"aal1"}';
+do $$
+begin
+ if not exists(select 1 from public.transport_messages where body='Synthetic carrier reply'
+  and conversation_id=current_setting('dz_test.chat')::uuid) then raise exception 'Customer cannot read carrier reply'; end if;
+end $$;
+
 
 set local request.jwt.claims='{"sub":"77000000-0000-0000-0000-000000000005","aal":"aal1"}';
 do $$
 begin
- if exists(select from public.transport_messages) then raise exception 'Third-party chat read'; end if;
+ if exists(select from public.transport_messages) or exists(select from public.transport_conversations)
+  or exists(select from public.transport_quotes) then raise exception 'Third-party quote or chat read'; end if;
 end $$;
 set local request.jwt.claims='{"sub":"77000000-0000-0000-0000-000000000003","aal":"aal1"}';
 select public.confirm_carrier_fee_terms(id,100000,'EUR','pro') from public.carrier_fee_terms;

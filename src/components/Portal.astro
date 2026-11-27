@@ -1,11 +1,11 @@
 ---
 import Layout from './Layout.astro';
-import {isProduction} from '../lib/site-config.mjs';
+import {interactive,isPilot} from '../lib/site-config.mjs';
 import {portalConfiguration} from '../lib/portal-config.mjs';
 import {portalCopy,portalTitles,statusLabels} from '../lib/portal-copy';
 import {localized,url,type Lang,type PortalPage} from '../lib/routes';
 const {lang,page}=Astro.props as {lang:Lang,page:PortalPage};
-const configuration=portalConfiguration(import.meta.env,isProduction);
+const configuration=portalConfiguration(import.meta.env,interactive,isPilot);
 const active=configuration && (page!=='manager' || configuration.manager) && (page!=='carrier' || configuration.partner);
 const labels=Object.fromEntries(Object.entries({...portalCopy,...portalTitles,...statusLabels}).map(([key,values])=>[key,localized(lang,values)]));
 const links=Object.fromEntries(Object.keys(portalTitles).map(key=>[key,url(lang,key as PortalPage)]));

@@ -3,17 +3,31 @@ import {httpsOrigin} from './site-origin.mjs';
 import {endpoint, phoneValid} from './form-core.mjs';
 
 export const siteMode = process.env.DZ_SITE_MODE || 'preview';
-export const siteUrl = process.env.SITE_URL || (siteMode === 'production' ? '' : 'https://localhost');
+export const siteUrl = process.env.SITE_URL || (siteMode === 'preview' ? 'https://localhost' : '');
 
 export const isProduction = siteMode === 'production';
+export const isPilot = siteMode === 'pilot';
+export const interactive = isProduction || isPilot;
 export const legalPages = ['privacy', 'terms', 'cookies'];
 
 export function configurationIssues(config, mode, options = {}) {
  const issues = [];
  const origin = httpsOrigin(options.siteUrl ?? process.env.SITE_URL);
  if (!origin) issues.push('SITE_URL');
- if (!['preview', 'production'].includes(mode)) return ['DZ_SITE_MODE'];
+ if (!['preview', 'pilot', 'production'].includes(mode)) return ['DZ_SITE_MODE'];
  if (mode === 'preview') return issues;
+ if (mode === 'pilot') {
+  const branch = options.pagesBranch ?? process.env.CF_PAGES_BRANCH;
+  const pages = options.pages ?? process.env.CF_PAGES;
+  const base = options.basePath ?? process.env.BASE_PATH;
+  if (pages !== '1' || !branch || branch === 'main') issues.push('Cloudflare Pages preview branch');
+  const alias = branch?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  if (!origin || !alias || alias === 'main' || origin !== `https://${alias}.dz-transport.pages.dev`) {
+   issues.push('SITE_URL must match the DZ Transport preview branch alias');
+  }
+  if (base && base !== '/') issues.push('BASE_PATH=/');
+  return issues;
+ }
  for (const key of ['operator', 'address', 'registration', 'businessHours']) {
   if (!config[key]?.trim()) issues.push(key);
  }
