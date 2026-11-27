@@ -11,7 +11,7 @@ const title=t(lang,titles[page])+' | DZ Transport';
 const description=t(lang,intro[page]);
 const home=t(lang,['Domov','Home','Startseite']);
 const loc={sl:'sl_SI',en:'en_GB',de:'de_DE'};
-const organization={'@type':'Organization','@id':absolute(url(defaultLanguage,'home'),Astro.site)+'#organization',name:company.name,url:absolute(url(defaultLanguage,'home'),Astro.site),logo:absolute(asset('brand/dz-transport-mark.svg'),Astro.site),parentOrganization:{'@type':'Organization',name:company.parentName,url:company.parentUrl},...(company.email?{email:company.email}:{}),...(company.telephone?{telephone:company.telephone}:{})};
+const organization={'@type':'Organization','@id':absolute(url(defaultLanguage,'home'),Astro.site)+'#organization',name:company.name,url:absolute(url(defaultLanguage,'home'),Astro.site),logo:absolute(asset('brand/dz-transport-mark.svg'),Astro.site),...(company.email?{email:company.email}:{}),...(company.telephone?{telephone:company.telephone}:{})};
 const socials=Object.entries(company.socialLinks).filter(([,href])=>{
  try {return typeof href==='string' && new URL(href).protocol==='https:';} catch {return false;}
 }) as [string,string][];
@@ -70,7 +70,7 @@ const noindex=preview || isPortal(page) || ['missing','confirmation',...legalPag
  <a class="skip" href="#main">{t(lang,['Preskoči na vsebino','Skip to content','Zum Inhalt springen'])}</a>
  {preview && <p class="preview-status">{t(lang,['Predogled · oddaja obrazcev je izključena','Preview · form submission is disabled','Vorschau · Formularversand ist deaktiviert'])}</p>}
  <header class="header">
-  <div class="topline"><div class="wrap"><span>{t(lang,['Slovenija in Evropa','Slovenia and Europe','Slowenien und Europa'])}</span><a href={company.parentUrl}>DZ Auto Trade</a>{socials.map(([name,href])=><a href={href}>{name}</a>)}</div></div>
+  <div class="topline"><div class="wrap"><span>{t(lang,['Slovenija in Evropa','Slovenia and Europe','Slowenien und Europa'])}</span>{socials.map(([name,href])=><a href={href}>{name}</a>)}</div></div>
   <div class="wrap header-row">
    <a class="brand" href={url(lang,'home')}><img src={asset('brand/dz-transport-mark.svg')} alt="" width="39" height="39"/><span>DZ <strong>TRANSPORT</strong></span></a>
    <nav id="mobile-nav" class="navigation" data-navigation aria-label={t(lang,['Glavna navigacija','Main navigation','Hauptnavigation'])}>
@@ -98,7 +98,7 @@ const noindex=preview || isPortal(page) || ['missing','confirmation',...legalPag
  </main>
  <footer class="footer">
   <div class="wrap footer-main">
-   <div><a class="brand" href={url(lang,'home')}><img src={asset('brand/dz-transport-mark.svg')} alt="" width="40" height="40"/><span>DZ <strong>TRANSPORT</strong></span></a><p>{t(lang,titles.home)}</p><a href={company.parentUrl}>DZ Auto Trade</a>{socials.map(([name,href])=><a href={href}>{name}</a>)}</div>
+   <div><a class="brand" href={url(lang,'home')}><img src={asset('brand/dz-transport-mark.svg')} alt="" width="40" height="40"/><span>DZ <strong>TRANSPORT</strong></span></a><p>{t(lang,titles.home)}</p>{socials.map(([name,href])=><a href={href}>{name}</a>)}</div>
    {footerGroups.map((group,index)=><div><h2>{[t(lang,titles.services),t(lang,['O platformi','About the platform','Zur Plattform']),t(lang,['Pravne informacije','Legal information','Rechtliches'])][index]}</h2>{group.map(item=><a href={url(lang,item)}>{t(lang,titles[item])}</a>)}</div>)}
   </div>
   <div class="wrap copyright">© {new Date().getFullYear()} DZ Transport</div>
