@@ -3,6 +3,7 @@ import {AxeBuilder} from '@axe-core/playwright';
 import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {grouping} from '../../src/lib/form-schema.mjs';
+import {copy,steps} from '../../src/lib/form-copy.ts';
 
 const origin='https://dz-transport.test';
 const root=(process.env.BASE_PATH || '/').replace(/\/$/,'');
@@ -318,4 +319,107 @@ test('portal preview is unavailable and noindexed in all locales',async({page})=
   await expect(page).toHaveURL(path(suffix));
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
  }
+});
+
+const publicRoutes=[
+ {language:'sl',prefix:'',partner:'partnerji',inquiry:'povprasevanje',confirmation:'potrditev',services:['prevoz-vozil','prevoz-palet','selitve']},
+ {language:'en',prefix:'/en',partner:'partners',inquiry:'inquiry',confirmation:'confirmation',services:['vehicle-transport','pallet-transport','moving']},
+ {language:'de',prefix:'/de',partner:'partner',inquiry:'anfrage',confirmation:'bestaetigung',services:['fahrzeugtransport','palettentransport','umzug']}
+];
+const featuredCategories=['car','pallet','moving'];
+
+for(const [locale,entry] of publicRoutes.entries()) test('V10 public inquiry and partner paths · '+entry.language,async({page})=>{
+ const {prefix,inquiry,confirmation,partner,services}=entry;
+ const category=featuredCategories[locale];
+ const navigate=section=>path(prefix+'/'+section+'/');
+ const next=btn(page,copy.next[locale]);
+ const previous=btn(page,copy.previous[locale]);
+ const submissions=[];
+ await useFiles(page,{configured:true});
+ await page.route(fixture,async route=>{
+  if(route.request().method()==='OPTIONS') return route.fulfill({status:204,headers:endpointHeaders});
+  const submission=route.request().postDataJSON();
+  submissions.push(submission);
+  await route.fulfill({status:200,headers:endpointHeaders,json:{ok:true,reference:submission.reference}});
+ });
+ for(const width of [1280,320]){
+  await page.setViewportSize({width,height:780});
+  await page.goto(path(prefix+'/'));
+  await expect(page.locator('.hero .primary')).toHaveAttribute('href',root+prefix+'/'+inquiry+'/');
+  await expect(page.locator('.hero .light')).toHaveAttribute('href',root+prefix+'/'+partner+'/');
+  await expect(page.locator('.hero-next')).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  await page.locator('.hero .light').click();
+  await expect(page).toHaveURL(navigate(partner));
+  await page.locator('a[href="#partner-application"]').click();
+  await expect(page.locator('#partner-application')).toBeVisible();
+  for(const [index,service] of services.entries()){
+   await page.goto(navigate(service));
+   await page.locator('.page-hero .primary').click();
+   await expect(byName(page,'transportCategory')).toHaveValue(featuredCategories[index]);
+  }
+ }
+ await page.goto(navigate(inquiry)+'?transportCategory=invalid');
+ await expect(byName(page,'transportCategory')).toHaveValue('');
+ await next.click();
+ await expect(page.locator('#transportCategory-error')).toHaveText(copy.required[locale]);
+
+ const other=featuredCategories[(locale+1)%3];
+ await byName(page,'transportCategory').selectOption(other);
+ await next.click();
+ await fillRequired(page);
+ await byName(page,'pickupCity').fill('Murska Sobota');
+ await byName(page,'deliveryCity').fill('Maribor');
+ await byName(page,'pickupCountry').selectOption('SI');
+ await byName(page,'deliveryCountry').selectOption('SI');
+ await next.click();
+ await fillRequired(page);
+ await previous.click();
+ await previous.click();
+ await byName(page,'transportCategory').selectOption(category);
+ await next.click();
+ await expect(byName(page,'pickupCity')).toHaveValue('Murska Sobota');
+ await expect(byName(page,'deliveryCity')).toHaveValue('Maribor');
+ await next.click();
+ await fillRequired(page);
+ if(category==='car'){
+  await byName(page,'running').selectOption('no');
+  await byName(page,'vehicleLoading').fill('Winch required');
+ } else if(category==='pallet') {
+  await byName(page,'unloadingEquipmentAvailable').selectOption('no');
+ } else {
+  await byName(page,'pickupCarryingHelp').selectOption('yes');
+  await byName(page,'deliveryCarryingHelp').selectOption('no');
+ }
+ await next.click();
+ await byName(page,'flexible').check();
+ await next.click();
+ await fillRequired(page);
+ await byName(page,'contactMethod').selectOption(locale===0?'phone':'email');
+ await next.click();
+ await expect(page.locator('[data-summary]')).toContainText('Murska Sobota → Maribor');
+ await btn(page,copy.edit[locale]+' '+steps[4][locale]).click();
+ await expect(byName(page,'email')).toHaveValue('transport@example.invalid');
+ await next.click();
+ await byName(page,'privacy').check();
+ await btn(page,copy.send[locale]).click();
+ await expect(page).toHaveURL(navigate(confirmation));
+ const [submission]=submissions;
+ expect(submissions).toHaveLength(1);
+ await expect(page.locator('[data-reference]')).toContainText(submission.reference);
+ await expect(page.locator('[data-next-step]')).toHaveText(copy[locale===0?'phoneNext':'emailNext'][locale]);
+ expect(submission.transportCategory).toBe(category);
+ if(category==='car') expect(submission.cargo).toMatchObject({running:'no',vehicleLoading:'Winch required'});
+ if(category==='pallet') {
+  expect(submission.cargo.unloadingEquipmentAvailable).toBe('no');
+  expect(submission.cargo.items[0]).toMatchObject({quantity:2,length:2,width:2,height:2,unitWeightKg:2});
+ }
+ if(category==='moving') expect(submission.cargo).toMatchObject({pickupCarryingHelp:'yes',deliveryCarryingHelp:'no'});
+ expect(submission.cargo[{car:'items',pallet:'floor',moving:'make'}[category]]).toBeUndefined();
+
+ await page.unrouteAll();
+ await useFiles(page);
+ await page.goto(navigate(confirmation));
+ await expect(page.locator('[data-confirmation-copy]')).toBeHidden();
+ await expect(page.locator('.page-hero')).toContainText(['oddaja obrazcev izključena','Form submission is disabled','Formularversand deaktiviert'][locale]);
 });

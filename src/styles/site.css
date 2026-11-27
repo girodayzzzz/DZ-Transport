@@ -55,6 +55,7 @@ summary{cursor:pointer}
 .hero h1{max-width:15ch;font-size:clamp(2.3rem,6.4vw,5.5rem)}
 .hero h1 em{color:#ffb43c;font-style:normal}
 .hero-desc{color:#eff3f8;max-width:575px;font-size:clamp(1rem,2vw,1.21rem);margin:1.4rem 0 1.7rem}
+.hero-next{color:#eff3f8;max-width:575px;margin:1rem 0 0}
 .actions{display:flex;gap:.7rem;flex-wrap:wrap}
 .quick-shell{position:relative;margin-top:-3.35rem;z-index:2}
 .quick{background:white;border:1px solid var(--line);border-top:4px solid var(--orange);padding:1.35rem 1.45rem 1.55rem;border-radius:7px;box-shadow:0 12px 35px #10264113}
@@ -177,6 +178,8 @@ legend{padding-inline:.3rem;font-weight:760}
 @media(max-width:520px){
  .hero h1{font-size:clamp(2.2rem,10vw,3.2rem)}
  .hero .eyebrow{font-size:.71rem}
+ .process li,.reasons li,.footer-main p{overflow-wrap:anywhere}
+ .reasons{grid-template-columns:repeat(2,minmax(0,1fr))}
  .quick form,.service-grid,.split,.audiences,.business-grid,.page-hero.with-photo .wrap,.form-grid{grid-template-columns:1fr}
  .quick-shell{margin-top:-2.6rem}
  .quick{padding-inline:1rem}

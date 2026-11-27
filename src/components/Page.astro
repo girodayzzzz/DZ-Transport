@@ -17,7 +17,7 @@ const corridor=corridors[page as keyof typeof corridors];
 const quote=t(lang,['Zahtevajte ponudbo','Request a Transport Quote','Transportangebot anfragen']);
 const legal=['privacy','terms','cookies'].includes(page);
 const sections=editorial[page as keyof typeof editorial] || [];
-const confirmation=Object.fromEntries(['received','partnerReceived','reference','referenceNote'].map(key=>[key,t(lang,copy[key as keyof typeof copy])]));
+const confirmation=Object.fromEntries(['received','partnerReceived','reference','referenceNote','inquiryNext','phoneNext','emailNext','partnerNext'].map(key=>[key,t(lang,copy[key as keyof typeof copy])]));
 ---
 <Layout {lang} {page}>
  {page==='home' ? <Home {lang}/> : <>
@@ -25,7 +25,7 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
    <div class="wrap">
     <div>
      <p class="eyebrow"><span></span>{page==='missing'?'404':selected?t(lang,titles.services):'DZ TRANSPORT'}</p>
-     <h1>{t(lang,titles[page])}</h1><p>{t(lang,intro[page])}</p>
+     <h1>{t(lang,titles[page])}</h1><p>{page==='confirmation' && !isProduction ? t(lang,['Na tem predogledu je oddaja obrazcev izključena.','Form submission is disabled on this preview.','In dieser Vorschau ist der Formularversand deaktiviert.']) : t(lang,intro[page])}</p>
      {selected && <a class="button primary" href={url(lang,'inquiry')+'?transportCategory='+selected+(page==='express'?'&urgent=1':'')}>{quote}</a>}
     </div>
     {selected && <img src={asset('images/'+page+'-800.webp')}
@@ -37,7 +37,18 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
    {page==='services' && <><h2 class="sr-only">{t(lang,titles.services)}</h2><Cards {lang}/></>}
    {selected && <div class="prose"><h2>{t(lang,['Kaj vključiti v povpraševanje','What to include in your inquiry','Was Ihre Anfrage enthalten sollte'])}</h2>{serviceDetails[page].map(detail=><p>{t(lang,detail)}</p>)}<a class="more" href={url(lang,'services')}>{t(lang,['Vse storitve','All services','Alle Leistungen'])}</a></div>}
    {page==='inquiry' && <Forms {lang} kind="inquiry"/>}
-   {page==='partners' && <><p class="prose lead">{t(lang,['Prijave obravnavamo individualno. Pred sodelovanjem preverimo zmogljivosti, zavarovanje in ustrezna dovoljenja.','We review applications individually and verify capacity, insurance and relevant licences before cooperating.','Wir prüfen jede Bewerbung einzeln sowie Kapazitäten, Versicherung und einschlägige Genehmigungen vor einer Zusammenarbeit.'])}</p><Forms {lang} kind="partner"/></>}
+   {page==='partners' && <>
+    <div class="prose">
+     <h2>{t(lang,['Sodelovanje za prevoznike','Working with transport providers','Zusammenarbeit mit Transportunternehmen'])}</h2>
+     <p>{t(lang,['Sodelovanje je namenjeno prevoznikom, ki izvajajo domače ali mednarodne prevoze.','We work with carriers providing domestic or international transport.','Die Zusammenarbeit richtet sich an Transportunternehmen im nationalen oder internationalen Verkehr.'])}</p>
+     <h2>{t(lang,['Kaj pripraviti za prijavo','What to prepare for your application','Was Sie für die Bewerbung benötigen'])}</h2>
+     <p>{t(lang,['Pripravite podatke o podjetju in kontaktni osebi, vozilih in zmogljivostih, vrstah prevozov in območju dela, zavarovanju ter ustreznih dovoljenjih.','Have your company and contact details, vehicle and capacity information, services and coverage, insurance, and any relevant licences ready.','Halten Sie Ihre Firmen- und Kontaktdaten sowie Angaben zu Fahrzeugen, Kapazitäten, Leistungen, Einsatzgebieten, Versicherung und erforderlichen Genehmigungen bereit.'])}</p>
+     <h2>{t(lang,['Kaj sledi po oddaji','What happens after you apply','So geht es nach der Bewerbung weiter'])}</h2>
+     <p>{t(lang,['Skrbnik pregleda prijavo in pred sodelovanjem preveri zmogljivosti, zavarovanje ter ustrezna dovoljenja. Dostop do portala za prevoznike zahteva račun in ločeno odobritev.','An administrator reviews your application and checks your capacity, insurance and relevant licences before cooperation begins. Carrier portal access requires an account and separate approval.','Ein Administrator prüft Ihre Bewerbung sowie Kapazitäten, Versicherung und erforderliche Genehmigungen vor Beginn der Zusammenarbeit. Der Zugang zum Transportpartnerportal setzt ein Konto und eine gesonderte Freigabe voraus.'])}</p>
+     <a class="button primary" href="#partner-application">{t(lang,['Oddajte prijavo','Apply to become a partner','Bewerbung einreichen'])}</a>
+    </div>
+    <Forms {lang} kind="partner"/>
+   </>}
    {page==='business' && <div class="business-grid"><div><h2>{t(lang,['Komu je namenjeno','Who we work with','Für wen wir Transporte koordinieren'])}</h2><ul class="reasons">{business.map(([heading,body])=><li><h3>{t(lang,heading)}</h3><p>{t(lang,body)}</p></li>)}</ul></div><article><h2>{t(lang,['Poslovno povpraševanje','Business inquiry','Geschäftliche Anfrage'])}</h2><p>{t(lang,['Za redne prevoze opišite pogostost, običajne relacije, količine in posebne zahteve.','For recurring shipments, describe frequency, typical routes, volumes and special requirements.','Nennen Sie bei regelmäßigen Sendungen Häufigkeit, typische Strecken, Mengen und besondere Anforderungen.'])}</p><div class="actions"><a class="button primary" href={url(lang,'inquiry')+'?customerType=business&businessPattern=once'}>{t(lang,['Enkratni prevoz','One-time shipment','Einmaliger Transport'])}</a><a class="button secondary" href={url(lang,'inquiry')+'?customerType=business&businessPattern=recurring'}>{t(lang,['Redni prevozi','Recurring shipments','Regelmäßige Transporte'])}</a></div></article></div>}
    {corridor && <div class="prose">
     <h2>{t(lang,['Podatki za ponudbo','Details for your quote','Angaben für Ihr Angebot'])}</h2>
@@ -60,12 +71,13 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
     {page==='privacy' && settings.privacy.provider && <p>{t(lang,['Ponudnik obrazcev','Form provider','Formulardienst'])} · {settings.privacy.provider}. {settings.privacy.retention || t(lang,['Rok hrambe bo določen pred objavo.','The retention period will be specified before launch.','Die Speicherdauer wird vor Veröffentlichung ergänzt.'])}</p>}
    </div>}
    {page==='contact' && <a class="button primary" href={url(lang,'inquiry')}>{quote}</a>}
-   {page==='confirmation' && <div data-confirmation-copy={JSON.stringify(confirmation)} hidden class="notice" role="status"><h2></h2><p data-reference></p><p>{confirmation.referenceNote}</p></div>}
+   {page==='confirmation' && <div data-confirmation-copy={JSON.stringify(confirmation)} hidden class="notice" role="status"><h2></h2><p data-reference></p><p data-next-step></p><p>{confirmation.referenceNote}</p></div>}
    {(page==='missing'||page==='confirmation') && <a class="button primary" href={url(lang,'home')}>{t(lang,['Nazaj na začetno stran','Back to the home page','Zurück zur Startseite'])}</a>}
   </div>
  </>}
 </Layout>
 <script>
+ import {confirmationNext} from '../lib/form-core.mjs';
  const panel=document.querySelector<HTMLElement>('[data-confirmation-copy]');
  if (panel) {
   try {
@@ -75,6 +87,7 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
     const copy=JSON.parse(panel.dataset.confirmationCopy!);
     panel.querySelector('h2')!.textContent=entry.kind==='partner'?copy.partnerReceived:copy.received;
     panel.querySelector('[data-reference]')!.textContent=copy.reference+' · '+entry.reference;
+    panel.querySelector('[data-next-step]')!.textContent=confirmationNext(copy,entry.kind,entry.contactMethod);
     panel.hidden=false;
    }
   } catch {}

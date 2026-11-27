@@ -85,3 +85,10 @@ export async function submit(postTo, data, request = fetch, timeout = 18000) {
  const receipt = await response.json();
  return receipt?.ok === true && (!('reference' in receipt) || receipt.reference === data.reference);
 }
+
+export function confirmationNext(copy,kind,contactMethod) {
+ if(kind==='partner') return copy.partnerNext;
+ if(contactMethod==='phone') return copy.phoneNext;
+ if(contactMethod==='email') return copy.emailNext;
+ return copy.inquiryNext;
+}

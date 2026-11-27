@@ -27,6 +27,10 @@ export const copy = {
  received:['Povpraševanje je bilo oddano.','Your inquiry was submitted.','Ihre Anfrage wurde gesendet.'],
  partnerReceived:['Prijava je bila oddana v pregled.','Your application was submitted for review.','Ihre Bewerbung wurde zur Prüfung übermittelt.'],
  reference:['Referenca oddaje','Submission reference','Versandreferenz'],
+ inquiryNext:['Pregledali bomo podatke o prevozu in vas kontaktirali po načinu, ki ste ga navedli.','We’ll review your transport details and contact you using the method you selected.','Wir prüfen Ihre Transportangaben und melden uns auf dem von Ihnen gewählten Weg.'],
+ emailNext:['Po pregledu povpraševanja vam bomo odgovorili na vpisani e-poštni naslov.','After reviewing your inquiry, we’ll reply to the email address you provided.','Nach Prüfung Ihrer Anfrage antworten wir an die angegebene E-Mail-Adresse.'],
+ phoneNext:['Po pregledu povpraševanja vas bomo poklicali na vpisano telefonsko številko.','After reviewing your inquiry, we’ll call you on the number you provided.','Nach Prüfung Ihrer Anfrage rufen wir Sie unter der angegebenen Telefonnummer an.'],
+ partnerNext:['Skrbnik bo pregledal prijavo. O nadaljnjih korakih vas obvestimo prek vpisanih kontaktnih podatkov.','An administrator will review your application. We’ll use the contact details you provided to let you know the next steps.','Ein Administrator prüft Ihre Bewerbung. Über die nächsten Schritte informieren wir Sie über die angegebenen Kontaktdaten.'],
  referenceNote:['Referenca pomaga pri komunikaciji o oddaji.','Use this reference in correspondence about your submission.','Nutzen Sie diese Referenz bei Rückfragen zu Ihrer Anfrage.']
 };
 export const steps = [

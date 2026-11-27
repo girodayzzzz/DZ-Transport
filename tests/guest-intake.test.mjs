@@ -113,3 +113,26 @@ test('guest partner handler validates the public form and uses the partner Turns
  assert.deepEqual(await (await submitPartner({request:request(),env})).json(),{ok:true,reference:input.reference});
  assert.equal(databaseCalls,1);
 });
+
+test('V10 cargo fields are optional for older submissions and only accepted in their category',()=>{
+ const data=fixture();
+ const current={...data.cargo,unloadingEquipmentAvailable:'no',pickupCarryingHelp:'yes'};
+ const pallet=validateGuestInquiry({...data,cargo:current},now);
+ assert.equal(pallet.cargo.unloadingEquipmentAvailable,'no');
+ assert.equal(pallet.cargo.pickupCarryingHelp,undefined);
+ assert.equal(validateGuestInquiry(data,now).cargo.unloadingEquipmentAvailable,undefined);
+ assert.throws(()=>validateGuestInquiry({...data,cargo:{...current,unloadingEquipmentAvailable:'unknown'}},now));
+
+ const moving={...data,transportCategory:'moving',cargo:{
+  propertyType:'Apartment',volumeM3:'6',itemCount:'8',floor:'2',elevator:'yes',loadingAssistance:'no',
+  deliveryFloor:'0',deliveryElevator:'no',packing:'no',assembly:'no',disassembly:'no',regulated:'no',oversized:'no',
+  pickupCarryingHelp:'no',deliveryCarryingHelp:'yes',unloadingEquipmentAvailable:'yes'
+ }};
+ const details=validateGuestInquiry(moving,now).cargo;
+ assert.equal(details.pickupCarryingHelp,'no');
+ assert.equal(details.deliveryCarryingHelp,'yes');
+ assert.equal(details.unloadingEquipmentAvailable,undefined);
+ delete moving.cargo.pickupCarryingHelp;
+ delete moving.cargo.deliveryCarryingHelp;
+ assert.equal(validateGuestInquiry(moving,now).cargo.deliveryCarryingHelp,undefined);
+});
