@@ -22,3 +22,15 @@ test('production accepts distinct mock HTTPS endpoints and approved operator set
  configured.endpoints.partner=configured.endpoints.inquiry;
  assert.deepEqual(configurationIssues(configured,'production',{siteUrl:'https://transport.example'}),['endpoints must be distinct']);
 });
+
+test('pilot requires a dedicated Cloudflare Pages preview branch and origin',()=>{
+ const pilot={pages:'1',pagesBranch:'codex/closed-pilot',siteUrl:'https://codex-closed-pilot.dz-transport.pages.dev',basePath:'/'};
+ assert.deepEqual(configurationIssues(config,'pilot',pilot),[]);
+ for(const override of [{pages:'0'},{pagesBranch:'main'},{siteUrl:'https://dz-transport.pages.dev'},
+  {siteUrl:'https://different.pages.dev'},{basePath:'/DZ-Transport/'}]) {
+  assert.notEqual(configurationIssues(config,'pilot',{...pilot,...override}).length,0);
+ }
+ const production=configurationIssues(config,'production',{...pilot,guestIntake:true,guestPartnerIntake:true});
+ assert.ok(production.includes('legal.approvalReference'));
+ assert.ok(production.includes('privacy.retention'));
+});

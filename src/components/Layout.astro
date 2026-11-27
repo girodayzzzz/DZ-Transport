@@ -1,7 +1,7 @@
 ---
 import '../styles/site.css';
 import company from '../../config/site.json';
-import {isProduction, legalPages} from '../lib/site-config.mjs';
+import {interactive,isPilot,isProduction,legalPages} from '../lib/site-config.mjs';
 import {titles,intro,t,faq} from '../lib/content';
 import {asset,absolute,isPortal,enabledLanguages,defaultLanguage,url,services,type Page,type Lang} from '../lib/routes';
 const {page,lang} = Astro.props as {page:Page,lang:Lang};
@@ -32,7 +32,7 @@ const navGroups=[
 ];
 const footerGroups=[['services','vehicle','pallet','cargo','moving','express','special'],['process','business','partners','faq','about','contact'],['privacy','terms','cookies']] as Page[][];
 const preview=!isProduction;
-const portalEnabled=isProduction && import.meta.env.PUBLIC_DZ_PORTAL === 'true';
+const portalEnabled=interactive && import.meta.env.PUBLIC_DZ_PORTAL === 'true';
 const analyticsToken=!preview && company.analytics.enabled && company.analytics.consentReviewed && /^[a-f0-9]{32}$/i.test(company.analytics.cloudflareToken)
  && !isPortal(page) && !['inquiry','partners','confirmation','missing'].includes(page) ? company.analytics.cloudflareToken : '';
 const noindex=preview || isPortal(page) || ['missing','confirmation',...legalPages].includes(page);
@@ -68,7 +68,7 @@ const noindex=preview || isPortal(page) || ['missing','confirmation',...legalPag
 </head>
 <body>
  <a class="skip" href="#main">{t(lang,['Preskoči na vsebino','Skip to content','Zum Inhalt springen'])}</a>
- {preview && <p class="preview-status">{t(lang,['Predogled · oddaja obrazcev je izključena','Preview · form submission is disabled','Vorschau · Formularversand ist deaktiviert'])}</p>}
+ {isPilot ? <p class="preview-status">{t(lang,['Zaprt pilot · samo testni podatki','Closed pilot · synthetic data only','Geschlossener Pilot · nur Testdaten'])}</p> : preview && <p class="preview-status">{t(lang,['Predogled · oddaja obrazcev je izključena','Preview · form submission is disabled','Vorschau · Formularversand ist deaktiviert'])}</p>}
  <header class="header">
   <div class="topline"><div class="wrap"><span>{t(lang,['Slovenija in Evropa','Slovenia and Europe','Slowenien und Europa'])}</span>{socials.map(([name,href])=><a href={href}>{name}</a>)}</div></div>
   <div class="wrap header-row">
@@ -76,7 +76,7 @@ const noindex=preview || isPortal(page) || ['missing','confirmation',...legalPag
    <nav id="mobile-nav" class="navigation" data-navigation aria-label={t(lang,['Glavna navigacija','Main navigation','Hauptnavigation'])}>
     <a href={url(lang,'home')} aria-current={page==='home'?'page':undefined}>{home}</a>
     {navGroups.map(group=><details><summary>{group.label}</summary><div class="dropdown">{group.pages.map(item=><a href={url(lang,item)} aria-current={page===item?'page':undefined}>{t(lang,titles[item])}</a>)}</div></details>)}
-    {preview && <a href={url(lang,'login')} aria-current={page==='login'?'page':undefined}>{t(lang,titles.login)}</a>}
+    {preview && !portalEnabled && <a href={url(lang,'login')} aria-current={page==='login'?'page':undefined}>{t(lang,titles.login)}</a>}
    </nav>
    <div class="header-actions">
     {portalEnabled && <a href={url(lang,'login')}>{t(lang,titles.login)}</a>}

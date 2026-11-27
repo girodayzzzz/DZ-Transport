@@ -1,5 +1,5 @@
 ---
-import {isProduction} from '../lib/site-config.mjs';
+import {interactive,isProduction,isPilot} from '../lib/site-config.mjs';
 import settings from '../../config/site.json';
 import {t, booking} from '../lib/content';
 import {url} from '../lib/routes';
@@ -10,13 +10,14 @@ import Field from './Field.astro';
 const {lang, kind} = Astro.props;
 const isPartner = kind === 'partner';
 const configured = isPartner ? settings.features.partners : settings.features.inquiries;
-const useSupabase = configured && isProduction && (isPartner
+const useSupabase = configured && interactive && (isPartner
  ? import.meta.env.PUBLIC_DZ_GUEST_PARTNER_INTAKE==='true' : import.meta.env.PUBLIC_DZ_GUEST_INTAKE==='true');
 const siteKey = useSupabase ? import.meta.env.PUBLIC_TURNSTILE_SITE_KEY : '';
 if (useSupabase && !/^[A-Za-z0-9_-]{12,100}$/.test(siteKey || '')) throw new Error('Guest intake requires a Turnstile site key');
 const postTo = useSupabase ? new URL(isPartner ? '/api/partner-application' : '/api/inquiry',Astro.site).href : configured && isProduction ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
 const strings = Object.fromEntries(Object.entries(copy).map(([key,value])=>[key,t(lang,value)]));
 ---
+{isPilot && <p class="notice">{t(lang,['Uporabite samo sintetične podatke za test.','Use synthetic test data only.','Verwenden Sie ausschließlich synthetische Testdaten.'])}</p>}
 <form id={isPartner ? 'partner-application' : undefined} class="inquiry-form" method="post" data-workflow={kind} data-endpoint={postTo} data-turnstile={siteKey || undefined} data-confirmation={url(lang,'confirmation')} data-copy={JSON.stringify(strings)} novalidate>
   {!postTo && <p class="notice">{strings.unavailable}</p>}
   <noscript><p class="notice">{t(lang,['Za izpolnjevanje obrazca omogočite JavaScript.','Enable JavaScript to use this form.','Aktivieren Sie JavaScript, um das Formular zu verwenden.'])}</p></noscript>
