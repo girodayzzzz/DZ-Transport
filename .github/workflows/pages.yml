@@ -115,4 +115,6 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/database/policies.sql
           psql -v ON_ERROR_STOP=1 -f tests/database/quick-deal.sql
           psql -v ON_ERROR_STOP=1 -f tests/database/v7.sql
+          psql -v ON_ERROR_STOP=1 -f tests/database/v8.sql
           bash tests/database/quick-deal-concurrency.sh
+          bash tests/database/v8-concurrency.sh
