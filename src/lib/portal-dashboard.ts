@@ -27,8 +27,8 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
  labels={...labels,...v8Labels};
  let paymentsEnabled=false;
  let paymentRows:Row[]=[];
- const inquiryFieldLabels=new Map([...customerFields,...location('pickup'),...location('delivery'),...Object.values(cargo).flat(),
-  ...cargoItem,...companyFields,...recurringFields,...schedule,...consents,regulated,oversized].map(field=>[field.key,field.labels[language]]));
+ const inquiryFields=new Map([...customerFields,...location('pickup'),...location('delivery'),...Object.values(cargo).flat(),
+  ...cargoItem,...companyFields,...recurringFields,...schedule,...consents,regulated,oversized].map(field=>[field.key,field]));
  const cell=(key:string,value:Row[string])=>{
   if(value===null || value===undefined) return '—';
   if(['created_at','expires_at','eligible_until','requested_at','reserved_until'].includes(key)) return new Intl.DateTimeFormat(document.documentElement.lang,{dateStyle:'medium',timeStyle:'short'}).format(new Date(String(value)));
@@ -476,10 +476,14 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
       for(const [name,value] of Object.entries(data)) {
        if(name==='items' && Array.isArray(value)) {
         for(const item of value) {
-         list.append(el('dt',labels.cargoItem),el('dd',Object.entries(item).map(([key,value])=>(inquiryFieldLabels.get(key) ?? key)+' '+String(value)).join(' · ')));
+         list.append(el('dt',labels.cargoItem),el('dd',Object.entries(item).map(([key,value])=>(inquiryFields.get(key)?.labels[language] ?? key)+' '+String(value)).join(' · ')));
         }
-       } else if(inquiryFieldLabels.has(name)) {
-        list.append(el('dt',inquiryFieldLabels.get(name)),el('dd',typeof value==='boolean' ? labels[value ? 'yes' : 'no'] : String(value)));
+       } else {
+        const field=inquiryFields.get(name);
+        if(!field) continue;
+        const option=field.options.find(candidate=>candidate[0]===value);
+        const answer=typeof value==='boolean' ? labels[value?'yes':'no'] : option?.[language+1] ?? String(value);
+        list.append(el('dt',field.labels[language]),el('dd',answer));
        }
       }
       guest.append(list);

@@ -18,7 +18,7 @@ export const types = [
 export const countries = 'AL AD AT BA BE BG BY CH CY CZ DE DK EE ES FI FR GB GR HR HU IE IS IT LI LT LU LV MC MD ME MK MT NL NO PL PT RO RS RU SE SI SK SM TR UA VA XK'.split(' ');
 export const grouping = {car:'vehicle',motorcycle:'vehicle',van:'vehicle',pallet:'pallet',cargo:'general',furniture:'moving',moving:'moving',machinery:'machinery',express:'general',nonRunning:'vehicle',partial:'general',full:'general',other:'general'};
 export const yn = [option('yes','Da','Yes','Ja'),option('no','Ne','No','Nein')];
-const yesNo = (key,labels) => field(key,labels,'select',true,yn);
+const yesNo = (key,labels,required=true) => field(key,labels,'select',required,yn);
 const notes = (key,labels) => field(key,labels,'textarea',false);
 const integer = (key,labels) => field(key,labels,'integer');
 const positive = (key,labels) => field(key,labels,'number');
@@ -52,6 +52,7 @@ export const cargo = {
   field('palletType',['Tip palete','Pallet type','Palettentyp'],'select',true,[
    option('eur','Evropaleta','Euro pallet','Europalette'),option('industrial','Industrijska','Industrial','Industriepalette'),option('other','Druga','Other','Sonstige')]),
   stackable,yesNo('loadingEquipmentAvailable',['Na voljo oprema za nakladanje','Loading equipment available','Verladeausrüstung verfügbar']),
+  yesNo('unloadingEquipmentAvailable',['Na dostavi je na voljo oprema za razkladanje','Unloading equipment is available at delivery','Am Ziel ist Entladeausrüstung vorhanden'],false),
   yesNo('tailLift',['Potrebna dvižna ploščad','Tail lift required','Ladebordwand erforderlich'])
  ],
  vehicle:[
@@ -74,10 +75,12 @@ export const cargo = {
   field('propertyType',['Vrsta objekta','Property type','Gebäudeart']),
   positive('volumeM3',['Ocenjen volumen (m³)','Estimated volume (m³)','Geschätztes Volumen (m³)']),
   integer('itemCount',['Število kosov ali škatel','Number of items or boxes','Anzahl der Stücke oder Kartons']),
-  field('floor',['Nadstropje (0 za pritličje)','Floor (0 for ground floor)','Etage (0 für Erdgeschoss)'],'floor'),
-  yesNo('elevator',['Dvigalo je na voljo','Elevator available','Aufzug vorhanden']),loading,
+  field('floor',['Nadstropje pri prevzemu (0 za pritličje)','Pickup floor (0 for ground floor)','Etage bei der Abholung (0 für Erdgeschoss)'],'floor'),
+  yesNo('elevator',['Dvigalo pri prevzemu','Elevator at pickup','Aufzug bei der Abholung']),loading,
+  yesNo('pickupCarryingHelp',['Potrebna pomoč pri nošenju ob prevzemu','Carrying help needed at pickup','Tragehilfe bei der Abholung erforderlich'],false),
   field('deliveryFloor',['Nadstropje dostave','Delivery floor','Etage am Ziel'],'floor'),
   yesNo('deliveryElevator',['Dvigalo na dostavi','Elevator at delivery','Aufzug am Ziel']),
+  yesNo('deliveryCarryingHelp',['Potrebna pomoč pri nošenju ob dostavi','Carrying help needed at delivery','Tragehilfe am Ziel erforderlich'],false),
   yesNo('packing',['Potrebno pakiranje','Packing required','Verpackung benötigt']),
   yesNo('assembly',['Potrebno sestavljanje','Assembly required','Montage benötigt']),
   yesNo('disassembly',['Potrebno razstavljanje','Disassembly required','Demontage erforderlich']),additional

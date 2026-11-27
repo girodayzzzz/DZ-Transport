@@ -17,7 +17,7 @@ if (useSupabase && !/^[A-Za-z0-9_-]{12,100}$/.test(siteKey || '')) throw new Err
 const postTo = useSupabase ? new URL(isPartner ? '/api/partner-application' : '/api/inquiry',Astro.site).href : configured && isProduction ? endpoint(isPartner ? settings.endpoints.partner : settings.endpoints.inquiry) : '';
 const strings = Object.fromEntries(Object.entries(copy).map(([key,value])=>[key,t(lang,value)]));
 ---
-<form class="inquiry-form" method="post" data-workflow={kind} data-endpoint={postTo} data-turnstile={siteKey || undefined} data-confirmation={url(lang,'confirmation')} data-copy={JSON.stringify(strings)} novalidate>
+<form id={isPartner ? 'partner-application' : undefined} class="inquiry-form" method="post" data-workflow={kind} data-endpoint={postTo} data-turnstile={siteKey || undefined} data-confirmation={url(lang,'confirmation')} data-copy={JSON.stringify(strings)} novalidate>
   {!postTo && <p class="notice">{strings.unavailable}</p>}
   <noscript><p class="notice">{t(lang,['Za izpolnjevanje obrazca omogočite JavaScript.','Enable JavaScript to use this form.','Aktivieren Sie JavaScript, um das Formular zu verwenden.'])}</p></noscript>
   {!isPartner && (

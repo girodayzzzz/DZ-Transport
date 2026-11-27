@@ -1,6 +1,6 @@
 import {loadTurnstile} from './turnstile';
 import { grouping } from './form-schema.mjs';
-import { cargoTotals, localDate, scheduleError, phoneValid, reference, payload, emailDetails, submit } from './form-core.mjs';
+import { confirmationNext, cargoTotals, localDate, scheduleError, phoneValid, reference, payload, emailDetails, submit } from './form-core.mjs';
 
 type Control = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 const controls = (root:ParentNode) => [...root.querySelectorAll<Control>('input:not(:disabled),select:not(:disabled),textarea:not(:disabled)')];
@@ -189,7 +189,11 @@ function initialize(form:HTMLFormElement) {
 
  function summary() {
   const container=get(form,'[data-summary]');
-  container.replaceChildren();
+  const current=values();
+  const route=document.createElement('p');
+  route.className='notice';
+  route.textContent=[current.pickupCity,current.deliveryCity].join(' → ');
+  container.replaceChildren(route);
   steps.slice(0,-1).forEach((step,index)=>{
    const block=document.createElement('section');
    const header=document.createElement('div');
@@ -212,6 +216,7 @@ function initialize(form:HTMLFormElement) {
     }
     const list=document.createElement('dl');
     for (const input of controls(group).filter(input=>!input.closest('.cargo-item'))) {
+     if (!input.required && !input.value.trim()) continue;
      const term=document.createElement('dt');
      const definition=document.createElement('dd');
      term.textContent=input.labels?.[0]?.textContent?.trim() || input.name;
@@ -321,13 +326,16 @@ function initialize(form:HTMLFormElement) {
    if (!accepted) throw new Error('Rejected');
    finished=true;
    try {
-    sessionStorage.setItem('dzt-confirmation',JSON.stringify({reference:data.reference,kind}));
+    sessionStorage.setItem('dzt-confirmation',JSON.stringify({reference:data.reference,kind,contactMethod:current.contactMethod}));
     location.assign(form.dataset.confirmation!);
    } catch {
     const confirmation=document.createElement('div');
     confirmation.className='notice';
     confirmation.tabIndex=-1;
     confirmation.textContent=(kind==='partner'?strings.partnerReceived:strings.received)+' '+strings.reference+' '+data.reference;
+    const nextStep=document.createElement('p');
+    nextStep.textContent=confirmationNext(strings,kind,current.contactMethod);
+    confirmation.append(nextStep);
     form.replaceWith(confirmation);
     confirmation.focus();
    }
