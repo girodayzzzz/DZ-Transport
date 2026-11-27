@@ -37,6 +37,7 @@ export const slugs = {
   customer:['portal-stranke','customer-portal','kundenportal'],
   carrier:['portal-prevozniki','partner-portal','partnerportal'],
   manager:['upravljanje','transport-manager','transport-manager'],
+  load:['tovor','load','fracht'],
   missing:['404','404','404']
 };
 export type Page = keyof typeof slugs;

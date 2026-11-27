@@ -48,6 +48,11 @@ const navigation=page==='login' ? ['register','forgot'] : page==='account' ? ['c
  .portal-table {overflow:auto}
  .portal article {min-width:0}
  .portal button {justify-self:start}
+ .portal .portal-checkbox {display:flex;align-items:center;gap:.6rem}
+ .portal .portal-checkbox input {width:auto;order:-1}
+ .portal article,.portal p {overflow-wrap:anywhere}
+ .portal [data-chat-log] {max-height:24rem;overflow:auto;white-space:pre-wrap}
+ .portal [data-portal-body]>nav {display:flex;flex-wrap:wrap;gap:.5rem 1rem}
  .portal [aria-busy=true] {opacity:.75}
  @media (min-width:850px) {
   .portal-grid {display:grid;grid-template-columns:12rem minmax(0,1fr);gap:2rem;align-items:start}

@@ -8,23 +8,36 @@ const base=(process.env.BASE_PATH||'/').replace(/\/$/,'');
 const routes={
  login:'login',register:'register',forgot:'forgot-password',reset:'reset-password',verify:'verify-email',
  callback:'auth-callback',account:'account',logout:'logout',deletion:'account-deletion',customer:'customer-portal',
- carrier:'partner-portal',manager:'transport-manager'
+ carrier:'partner-portal',manager:'transport-manager',load:'load'
 };
 const links=Object.fromEntries(Object.entries(routes).map(([key,path])=>[key,base+'/en/'+path+'/']));
-const labels=Object.fromEntries(Object.entries({...portalCopy,...portalTitles,...statusLabels}).map(([key,values])=>[key,values[1]]));
+const localizedLabels=position=>Object.fromEntries(Object.entries({...portalCopy,...portalTitles,...statusLabels})
+ .map(([key,values])=>[key,values[position]]));
+const labels=localizedLabels(1);
+const v7Routes={
+ sl:{login:'prijava',customer:'portal-stranke',carrier:'portal-prevozniki',manager:'upravljanje',load:'tovor'},
+ en:routes,
+ de:{login:'anmelden',customer:'kundenportal',carrier:'partnerportal',manager:'transport-manager',load:'fracht'}
+};
+const loadId='77100000-0000-0000-0000-000000000001';
+const chatId='77100000-0000-0000-0000-000000000002';
+const orderId='77100000-0000-0000-0000-000000000003';
+const loadReference='Synthetic transport reference';
 const user={id:'cccccccc-cccc-4ccc-bccc-cccccccccccc',email:'customer@example.invalid',
  email_confirmed_at:'2026-11-26T12:00:00Z',app_metadata:{},user_metadata:{},aud:'authenticated'};
 const secret='synthetic-test-password';
 
-async function setup(page,{onboarding=false,google=false,quickDeal=false}={}) {
- const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google,onboarding,quickDeal},labels,links});
+async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='en',v7=false}={}) {
+ const paths=Object.fromEntries(Object.entries(v7Routes[lang]).map(([key,path])=>[key,base+'/'+(lang==='sl'?'':lang+'/')+path+'/']));
+ const dictionary=localizedLabels(['sl','en','de'].indexOf(lang));
+ const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google,onboarding,quickDeal},labels:dictionary,links:paths});
  let profile=null;
  let requestedDeal=false;
  const calls=[];
  await page.route(origin+'/**',async route=>{
   const url=new URL(route.request().url());
   const relative=url.pathname.slice(base.length).replace(/^\//,'');
-  if(!/^(_astro\/[^/]+\.(js|css)|en\/[a-z-]+\/)$/.test(relative)) return route.fulfill({status:404});
+  if(!/^(_astro\/[^/]+\.(js|css)|(?:(?:en|de)\/)?[a-z-]+\/)$/.test(relative)) return route.fulfill({status:404});
   const file=await readFile('dist/'+relative+(relative.endsWith('/')?'index.html':''),'utf8');
   if(relative.endsWith('/')) {
    const escaped=init.replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;');
@@ -46,14 +59,38 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false}={}) {
   const data=request.postDataJSON();
   calls.push({path:url.pathname,search:url.search,data});
   const respond=(json,status=200)=>route.fulfill({status,headers,json});
-  const session={access_token:'fixture-access-token',refresh_token:'fixture-refresh-token',
+  const encoded=value=>Buffer.from(JSON.stringify(value)).toString('base64url');
+  const token=v7 ? encoded({alg:'HS256'})+'.'+encoded({aal:'aal2',sub:user.id})+'.fixture' : 'fixture-access-token';
+  const session={access_token:token,refresh_token:'fixture-refresh-token',
    token_type:'bearer',expires_in:3600,user};
   if(url.pathname==='/auth/v1/authorize') return route.fulfill({
    contentType:'text/html',
    body:'<a href="'+origin+links.callback+'?code=synthetic-oauth-code">Approve fixture consent</a>'
   });
+  if(v7) {
+   const fixtures={
+    public_load:[{category:'pallet',origin_country:'SI',destination_country:'DE',test_data:true,can_ask:false}],
+    public_load_questions:[{question:'Synthetic public question',answer:'Synthetic public answer'}],
+    list_load_questions:[],load_publication:null,
+    user_roles:[{id:'admin'}],manager_counts:[],manager_financials:[],
+    partner_applications:[{id:'application',state:'approved'}],my_carrier_plan:'basic',
+    transport_inquiries:[{id:loadId,reference:loadReference,origin:'SI',destination:'DE',status:'scheduled'}],
+    transport_orders:[{id:orderId,inquiry_id:loadId}],
+    transport_assignments:[{order_id:orderId,instructions:'Fixture instructions'}],
+    transport_status_history:[{inquiry_id:loadId,status:'scheduled',created_at:'2026-11-26T12:00:00Z'}],
+    transport_conversations:[{id:chatId,order_id:orderId,reference:loadReference}],
+    transport_messages:[{body:'Synthetic private message',sender_id:user.id,created_at:'2026-11-26T12:00:00Z'}],
+    notifications:[{id:'notification',event:'transport_message',conversation_id:chatId,created_at:'2026-11-26T12:00:00Z'}],
+    carrier_fees:[{id:'fee',order_id:orderId,reference:loadReference,plan:'basic',rate:7,base_minor:100000,
+     fee_minor:7000,currency:'EUR',created_at:'2026-11-26T12:00:00Z',voided_at:'2026-11-26T13:00:00Z'}]
+   };
+   const key=url.pathname.split('/').at(-1);
+   if(Object.hasOwn(fixtures,key)) return respond(fixtures[key]);
+   if(key==='send_transport_message') return route.fulfill({status:204,headers});
+  }
   if(quickDeal && url.pathname==='/rest/v1/partner_applications') return respond([{id:'application',state:'approved'}]);
-  if(quickDeal && url.pathname.endsWith('/rpc/list_quick_deals')) {
+  if(quickDeal && url.pathname.endsWith('/rpc/my_carrier_plan')) return respond('free');
+ if(quickDeal && url.pathname.endsWith('/rpc/list_quick_deals')) {
    return respond([{
     id:'fixture-deal',reference:'Fixture transport',cargo_category:'Pallets',pickup_region:'SI',delivery_region:'DE',
     status:requestedDeal?'acceptance_requested':'available',has_requested:requestedDeal,carrier_minor:45000,currency:'EUR',
@@ -86,7 +123,7 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false}={}) {
   if(url.pathname.startsWith('/rest/v1/')) return respond([]);
   return respond({},404);
  });
- return {calls,open:key=>page.goto(origin+links[key])};
+ return {calls,dictionary,open:(key,suffix='')=>page.goto(origin+paths[key]+suffix)};
 }
 
 test('registration, email confirmation, sign-out and ordinary login',async({page})=>{
@@ -104,7 +141,7 @@ test('registration, email confirmation, sign-out and ordinary login',async({page
  await page.getByLabel(labels.name,{exact:true}).fill('Synthetic Private Customer');
  await expect(page.getByLabel(labels.registeredBusinessName,{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:labels.activateFree,exact:true}).click();
- await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:labels.inProgress,exact:true})).toBeVisible();
  await open('logout');
  await page.getByRole('button',{name:'Sign out',exact:true}).click();
  await expect(page).toHaveURL(origin+links.login);
@@ -112,7 +149,7 @@ test('registration, email confirmation, sign-out and ordinary login',async({page
  await page.getByLabel('Password',{exact:true}).fill(secret);
  await page.getByRole('button',{name:'Sign in',exact:true}).click();
  await expect(page).toHaveURL(origin+links.customer);
- await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:labels.inProgress,exact:true})).toBeVisible();
 });
 
 test('password recovery and a refused expired session',async({page})=>{
@@ -135,7 +172,7 @@ test('password recovery and a refused expired session',async({page})=>{
  await open('customer');
  await expect(page.locator('[data-portal-status]')).toHaveText(labels.authRequired);
  expect(calls.some(call=>call.search.includes('grant_type=refresh_token'))).toBeTruthy();
- await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:labels.inProgress,exact:true})).toHaveCount(0);
 });
 
 test('Google registration shares resumable business customer onboarding',async({page})=>{
@@ -158,7 +195,7 @@ test('Google registration shares resumable business customer onboarding',async({
  await page.getByLabel(labels.name,{exact:true}).fill('Synthetic Customer');
  await page.getByLabel(labels.registeredBusinessName,{exact:true}).fill('Synthetic Transport Buyer');
  await page.getByRole('button',{name:labels.activateFree,exact:true}).click();
- await expect(page.getByRole('heading',{name:'Inquiries',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:labels.inProgress,exact:true})).toBeVisible();
  expect(calls.find(call=>call.path.endsWith('/complete_free_customer_onboarding')).data)
   .toEqual({p_name:'Synthetic Customer',p_business_name:'Synthetic Transport Buyer'});
 });
@@ -180,8 +217,48 @@ test('eligible carrier filters and requests a Quick Deal',async({page})=>{
  await deals.getByRole('combobox',{name:labels.status,exact:true}).selectOption('all');
  await deals.getByRole('button',{name:labels.search,exact:true}).click();
  await deals.locator('summary').filter({hasText:labels.quickDealRequest}).click();
+ await deals.getByRole('checkbox',{name:labels.acceptFeeTerms}).check();
  await deals.getByRole('button',{name:labels.quickDealRequest,exact:true}).click();
  await expect(deals.getByRole('cell',{name:labels.acceptance_requested})).toBeVisible();
- expect(calls.find(call=>call.path.endsWith('/request_quick_deal')).data).toEqual({p_deal:'fixture-deal'});
+ expect(calls.find(call=>call.path.endsWith('/request_quick_deal')).data).toEqual({p_deal:'fixture-deal',p_amount:45000,p_currency:'EUR',p_plan:'free'});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+
+for(const lang of ['sl','en','de']) test('V7 mobile portal flows · '+lang,async({page})=>{
+ const {calls,open,dictionary:copy}=await setup(page,{v7:true,lang});
+ await page.setViewportSize({width:390,height:844});
+ await open('load','?id='+loadId);
+ await expect(page.getByRole('heading',{name:copy.questions})).toBeVisible();
+ await expect(page.getByText('Synthetic public answer')).toBeVisible();
+ await expect(page.getByText(copy.testListing)).toBeVisible();
+ await expect(page.getByRole('button',{name:copy.ask,exact:true})).toHaveCount(0);
+ await open('login');
+ await page.getByLabel(copy.email,{exact:true}).fill(user.email);
+ await page.getByLabel(copy.password,{exact:true}).fill(secret);
+ await page.getByRole('button',{name:copy.login,exact:true}).click();
+ await expect(page.getByRole('heading',{name:copy.inProgress,exact:true})).toBeVisible();
+ await page.locator('summary').filter({hasText:copy.questions}).click();
+ await page.getByRole('button',{name:copy.refreshQuestions}).click();
+ const notification=page.locator('#notifications').getByRole('link',{name:loadReference});
+ await notification.click();
+ await expect(page.getByText('Synthetic private message')).toBeVisible();
+ await page.getByLabel(copy.message,{exact:true}).fill('Fixture reply');
+ await page.getByRole('button',{name:copy.sendMessage,exact:true}).click();
+ await expect(page.getByLabel(copy.message,{exact:true})).toHaveValue('');
+ expect(calls.find(call=>call.path.endsWith('/rpc/send_transport_message')).data)
+  .toMatchObject({p_conversation:chatId,p_body:'Fixture reply'});
+
+ await open('carrier');
+ await expect(page.locator('#assignments').getByText(copy.scheduled,{exact:false})).toBeVisible();
+ await expect(page.getByRole('heading',{name:copy.fees,exact:true})).toBeVisible();
+ await expect(page.locator('#fees article').getByText(copy.feeAmount,{exact:false})).toBeVisible();
+ await expect(page.locator('#fees').getByText('7 %',{exact:false})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+ await open('manager');
+ await expect(page.getByRole('heading',{name:copy.fees,exact:true})).toBeVisible();
+ await expect(page.locator('#inquiries summary').first()).toBeVisible();
+ await expect(page.getByRole('heading',{name:copy.chat,exact:true})).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

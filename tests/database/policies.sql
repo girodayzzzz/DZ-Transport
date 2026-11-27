@@ -100,7 +100,7 @@ select public.invite_partner('10000000-0000-0000-0000-000000000001','00000000-00
 select id as opportunity from public.transport_opportunities \gset
 
 select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000003","aal":"aal1"}',true);
-select public.submit_carrier_quote(:'opportunity',60000,'EUR','Fixture VAT',current_date+7);
+select public.submit_carrier_quote(:'opportunity',60000,'EUR','Fixture VAT',current_date+7,'free');
 do $$
 begin
  if (select count(*) from public.transport_opportunities)<>1 or (select count(*) from public.transport_quotes)<>1 or

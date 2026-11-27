@@ -1,4 +1,7 @@
+import {v7Copy} from './v7-copy';
+
 export const portalTitles = {
+ load: v7Copy.load,
  login: ['Prijava','Sign in','Anmelden'],
  register: ['Registracija','Register','Registrieren'],
  forgot: ['Pozabljeno geslo','Forgot password','Passwort vergessen'],
@@ -14,6 +17,7 @@ export const portalTitles = {
 };
 
 export const portalCopy = {
+ ...v7Copy,
  quickDeals: ['Prevozi s fiksno ceno','Quick Deals','Transporte zum Festpreis'],
  quickDealHelp: ['Zahteva in rezervacija sta nezavezujoči. Dodelitev sledi po potrditvi pogodbe in pogojev.','Requests and reservations are non-binding. Assignment follows confirmation of the contract and eligibility.','Anfragen und Reservierungen sind unverbindlich. Die Zuweisung erfolgt nach Bestätigung des Vertrags und der Voraussetzungen.'],
  quickDealCreate: ['Pripravi prevoz s fiksno ceno','Draft a Quick Deal','Festpreisangebot entwerfen'],

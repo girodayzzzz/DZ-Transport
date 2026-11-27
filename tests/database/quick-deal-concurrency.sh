@@ -35,7 +35,7 @@ request() {
  psql "${psql_args[@]}" <<SQL
 set role authenticated;
 set request.jwt.claims='{"sub":"${base_id}$1","aal":"aal1"}';
-select public.request_quick_deal('$deal_id');
+select public.request_quick_deal('$deal_id',45000,'EUR','free');
 SQL
 }
 request 2 >"$work_dir/request2" &
@@ -85,9 +85,62 @@ if wait "$contender"; then
 fi
 grep -q 'Already reserved' "$work_dir/contender"
 test "$(psql "${psql_args[@]}" -c "select reserved_partner from dz_private.quick_deals where id='$deal_id'")" = "${base_id}2"
+# Both final confirmation sessions target the same order. Only one can create records.
+order_id=$(psql "${psql_args[@]}" <<SQL | tail -n 1
+set role authenticated;
+set request.jwt.claims='{"sub":"${base_id}1","aal":"aal2"}';
+select public.prepare_customer_offer('${base_id}4',60000,'EUR','Fixture VAT',current_date+7,1,5000);
+select public.advance_transport('${base_id}4','offer_sent');
+select public.record_guest_acceptance(id,'Synthetic acceptance evidence')
+ from public.transport_quotes where inquiry_id='${base_id}4';
+select id from public.transport_orders where inquiry_id='${base_id}4';
+SQL
+)
+test -n "$order_id"
+rm "$work_dir/abort" "$work_dir/contended"
+psql "${psql_args[@]}" >"$work_dir/assignment" <<SQL &
+begin;
+set local role authenticated;
+set local request.jwt.claims='{"sub":"${base_id}1","aal":"aal2"}';
+select public.assign_quick_deal('$deal_id','$order_id','Confirmed fixture instructions',true);
+\! touch '$work_dir/assigned'
+\! while test ! -f '$work_dir/contended' && test ! -f '$work_dir/abort'; do sleep .05; done
+commit;
+SQL
+winner=$!
+for attempt in {1..100}; do
+ test ! -f "$work_dir/assigned" || break
+ sleep .05
+done
+test -f "$work_dir/assigned"
+
+PGAPPNAME=dz_final_assignment_contender psql "${psql_args[@]}" >"$work_dir/final-contender" 2>&1 <<SQL &
+set role authenticated;
+set request.jwt.claims='{"sub":"${base_id}1","aal":"aal2"}';
+select public.assign_quick_deal('$deal_id','$order_id','Confirmed fixture instructions',true);
+SQL
+contender=$!
+for attempt in {1..100}; do
+ if test "$(psql "${psql_args[@]}" -c "select count(*) from pg_stat_activity where application_name='dz_final_assignment_contender' and wait_event_type='Lock'")" = 1; then
+  touch "$work_dir/contended"
+  break
+ fi
+ sleep .05
+done
+touch "$work_dir/abort"
+wait "$winner"
+winner=
+test -f "$work_dir/contended"
+if wait "$contender"; then
+ echo 'Duplicate final confirmation unexpectedly succeeded' >&2
+ exit 1
+fi
+for records in carrier_fees transport_conversations transport_assignments; do
+ test "$(psql "${psql_args[@]}" -c "select count(*) from public.$records where order_id='$order_id'")" = 1
+done
 psql "${psql_args[@]}" <<SQL
 delete from public.transport_inquiries where id='${base_id}4';
 delete from auth.users where id in ('${base_id}1','${base_id}2','${base_id}3');
 update dz_private.quick_deal_settings set enabled=false;
 SQL
-echo 'Concurrent Quick Deal requests and exclusive reservation passed.'
+echo 'Concurrent Quick Deal requests, exclusive reservation and exclusive final confirmation passed.'
