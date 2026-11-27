@@ -1,11 +1,11 @@
 {
   "name": "DZ Transport",
-  "operator": "",
-  "address": "",
-  "registration": "",
-  "vat": "",
-  "email": "",
-  "telephone": "",
+  "operator": "DAYZZZZ SPLETNA TRGOVINA, TIBI TOPOLINJAK MUNDA S.P.",
+  "address": "Spodnji Ključarovci 15A, 2274 Velika Nedelja, Slovenija",
+  "registration": "9216316000",
+  "vat": "SI23492783",
+  "email": "dzautotrade@gmail.com",
+  "telephone": "+386 70 665 050",
   "socialLinks": {},
   "languages": [
     "sl",
@@ -30,8 +30,8 @@
     "inquiries": true,
     "partners": true
   },
-  "businessHours": "",
-  "vatApplicable": null,
+  "businessHours": "24/7 (Europe/Ljubljana)",
+  "vatApplicable": true,
   "legal": {
     "contractualRole": "",
     "approvalReference": ""

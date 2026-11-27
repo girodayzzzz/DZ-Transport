@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import config from '../config/site.json' with {type:'json'};
 import {assertConfiguration, configurationIssues} from '../src/lib/site-config.mjs';
 
-test('preview accepts blank settings while production rejects missing operator and approval',()=>{
+test('confirmed operator details allow preview while production requires legal approval and endpoints',()=>{
  assert.doesNotThrow(()=>assertConfiguration('preview'));
- assert.throws(()=>assertConfiguration('production'), /operator.*approvalReference.*endpoints.inquiry/);
+ assert.throws(()=>assertConfiguration('production'), /privacy.retention.*contractualRole.*approvalReference.*endpoints.inquiry/);
  assert.throws(()=>assertConfiguration('unknown'), /DZ_SITE_MODE/);
 });
 

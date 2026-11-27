@@ -60,15 +60,15 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
    </div>}
    {page==='process' && <><ol class="process vertical">{process.map((step,index)=><li><span>{index+1}</span>{t(lang,step)}</li>)}</ol><p class="notice">{t(lang,booking)}</p><a class="button primary" href={url(lang,'inquiry')}>{quote}</a></>}
    {page==='faq' && <div class="faq">{faq.map(([question,answer])=><details><summary>{t(lang,question)}</summary><p>{t(lang,answer)}</p></details>)}</div>}
-   {legal && !isProduction && <p class="notice">{t(lang,['Osnutek za pregled upravljavca pred javno objavo.','Draft for operator review before public launch.','Entwurf zur Prüfung durch den Betreiber vor der Veröffentlichung.'])}</p>}
+   {legal && (!isProduction || !settings.legal.approvalReference) && <p class="notice">{t(lang,['Osnutek za pregled upravljavca pred javno objavo.','Draft for operator review before public launch.','Entwurf zur Prüfung durch den Betreiber vor der Veröffentlichung.'])}</p>}
    {sections.length>0 && <div class="prose">{sections.map(([heading,body])=><section><h2>{t(lang,heading)}</h2><p>{t(lang,body)}</p></section>)}</div>}
-   {(page==='privacy'||page==='terms'||page==='contact') && <div class="prose">
+   {(legal||page==='contact') && <div class="prose">
     <h2>{t(lang,['Podatki upravljavca','Operator details','Betreiberangaben'])}</h2>
-    {settings.operator ? <p>{settings.operator}<br/>{settings.address}<br/>{settings.registration}<br/>{settings.vat}</p> : <p>{t(lang,['Podatki bodo dodani pred objavo.','Details will be added before launch.','Die Angaben werden vor der Veröffentlichung ergänzt.'])}</p>}
+    {settings.operator ? <p>{settings.operator}<br/>{settings.address}<br/>{t(lang,['Matična številka','Registration number','Registernummer'])} {settings.registration}<br/>{t(lang,['ID za DDV','VAT ID','USt-IdNr.'])} {settings.vat}</p> : <p>{t(lang,['Podatki bodo dodani pred objavo.','Details will be added before launch.','Die Angaben werden vor der Veröffentlichung ergänzt.'])}</p>}
     {settings.email && <p><a href={'mailto:'+settings.email}>{settings.email}</a></p>}{settings.telephone&&<p><a href={'tel:'+settings.telephone.replace(/\s/g,'')}>{settings.telephone}</a></p>}
-    {page==='contact' && settings.businessHours && <p>{settings.businessHours}</p>}
+    {page==='contact' && settings.businessHours && <p>{t(lang,['Delovni čas','Business hours','Geschäftszeiten'])} {settings.businessHours}</p>}
     {page==='terms' && settings.legal.contractualRole && <p>{settings.legal.contractualRole}</p>}
-    {page==='privacy' && settings.privacy.provider && <p>{t(lang,['Ponudnik obrazcev','Form provider','Formulardienst'])} · {settings.privacy.provider}. {settings.privacy.retention || t(lang,['Rok hrambe bo določen pred objavo.','The retention period will be specified before launch.','Die Speicherdauer wird vor Veröffentlichung ergänzt.'])}</p>}
+    {page==='privacy' && settings.privacy.provider && <p>{t(lang,['Ponudniki obdelave podatkov','Data service providers','Datenverarbeitungsdienstleister'])} · {settings.privacy.provider}. {settings.privacy.retention || t(lang,['Rok hrambe bo določen pred objavo.','The retention period will be specified before launch.','Die Speicherdauer wird vor Veröffentlichung ergänzt.'])}</p>}
    </div>}
    {page==='contact' && <a class="button primary" href={url(lang,'inquiry')}>{quote}</a>}
    {page==='confirmation' && <div data-confirmation-copy={JSON.stringify(confirmation)} hidden class="notice" role="status"><h2></h2><p data-reference></p><p data-next-step></p><p>{confirmation.referenceNote}</p></div>}
