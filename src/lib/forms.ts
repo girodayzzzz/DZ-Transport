@@ -35,7 +35,7 @@ function initialize(form:HTMLFormElement) {
   challengeStarted=true;
   try {
    const widget=await loadTurnstile();
-   const id=widget.render(challenge,{sitekey:siteKey,action:'guest-inquiry',language:document.documentElement.lang,
+   const id=widget.render(challenge,{sitekey:siteKey,action:kind==='partner' ? 'guest-partner' : 'guest-inquiry',language:document.documentElement.lang,
     callback:result=>{token=result;refresh();},
     'expired-callback':()=>{token='';refresh();},
     'error-callback':()=>{token='';refresh();error.textContent=strings.failed;error.hidden=false;}
@@ -124,9 +124,8 @@ function initialize(form:HTMLFormElement) {
   if (query.has('urgent') && values().transportCategory === 'express') (form.elements.namedItem('urgent') as HTMLInputElement).checked=true;
   next!.disabled=false;
  }
- send.disabled=!endpoint || working || Boolean(siteKey && !token);
-
  function refresh() {
+  send.disabled=!endpoint || working || finished || Boolean(siteKey && !token);
   const current = values();
   for (const panel of form.querySelectorAll<HTMLFieldSetElement>('[data-cargo], [data-company]')) {
    const enabled = panel.hasAttribute('data-company')
@@ -264,6 +263,7 @@ function initialize(form:HTMLFormElement) {
  }
 
  refresh();
+ if(kind==='partner') void startChallenge();
  form.addEventListener('change',refresh);
  form.addEventListener('input',event=>{
   const field=event.target as Control;
@@ -344,7 +344,6 @@ function initialize(form:HTMLFormElement) {
     refresh();
     error.tabIndex=-1;
     error.focus();
-    send.disabled=false;
     if (previous) previous.disabled=false;
    }
   }

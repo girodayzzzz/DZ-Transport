@@ -1,5 +1,5 @@
 import type {SupabaseClient} from '@supabase/supabase-js';
-import {cargo,cargoItem,companyFields,consents,customer as customerFields,location,oversized,recurringFields,regulated,schedule,types} from './form-schema.mjs';
+import {cargo,cargoItem,companyFields,consents,customer as customerFields,location,oversized,partner as partnerFields,recurringFields,regulated,schedule,types} from './form-schema.mjs';
 import type {Field} from './portal';
 import {paymentCopy} from './v8-copy';
 
@@ -388,7 +388,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
  async function manager() {
   const [inquiries,applications,companies,quotes,costs,orders,notes,financials,stats,deletions,quickDeals]=await Promise.all([
    rows('transport_inquiries','id,reference,origin,destination,status,contact_email,contact_name,description,archived_at,customer_id'),
-   rows('partner_applications','id,applicant_id,state'),
+   rows('partner_applications','id,applicant_id,state,created_at'),
    rows('companies','owner_id,name,services,coverage'),
    rows('transport_quotes','id,inquiry_id,opportunity_id,status,amount_minor,currency,vat_treatment,valid_until'),
    rows('quote_costs','quote_id,carrier_minor,expenses_minor'),
@@ -413,7 +413,25 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   const partnerOptions=applications.filter(row=>row.state==='approved' && row.applicant_id)
    .map(row=>[String(row.applicant_id),String(companies.find(company=>company.owner_id===row.applicant_id)?.name ?? row.applicant_id)] as [string,string]);
   table(section('application'),applications.map(row=>({...row,...companies.find(company=>company.owner_id===row.applicant_id)})),
-   [['name','company'],['services','services'],['coverage','coverage'],['state','status']],(parent,row)=>{
+   [['name','company'],['services','services'],['coverage','coverage'],['state','status'],['created_at','date']],(parent,row)=>{
+    if(!row.applicant_id) {
+     const details=el('div');
+     form(parent,[],labels.details,async()=>{
+      const receipt=await rpc('manager_guest_partner_details',{p_application:row.id}) as {
+       reference:string;application:Record<string,string>;permission:{privacy:boolean}
+      }|null;
+      details.replaceChildren();
+      if(!receipt) {details.append(el('p',labels.empty));return;}
+      details.append(el('p',labels.reference+' '+receipt.reference));
+      const list=el('dl');
+      for(const field of [...partnerFields,consents[0]]) {
+       const value=field.key==='privacy' ? labels[receipt.permission.privacy?'yes':'no'] : receipt.application[field.key];
+       if(value) list.append(el('dt',field.labels[language]),el('dd',value));
+      }
+      details.append(list);
+     });
+     parent.append(details);
+    }
     if(row.applicant_id && row.name) action(parent,'save',[
      field('services','services',{max:500,value:String(row.services)}),
      field('coverage','coverage',{max:500,value:String(row.coverage)})

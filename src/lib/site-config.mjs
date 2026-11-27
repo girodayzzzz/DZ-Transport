@@ -26,7 +26,7 @@ export function configurationIssues(config, mode, options = {}) {
  if (!config.legal.approvalReference?.trim()) issues.push('legal.approvalReference');
  const inquiry = options.guestIntake ? origin && origin + '/api/inquiry' : endpoint(config.endpoints.inquiry);
  if (!inquiry) issues.push('endpoints.inquiry');
- const partner = endpoint(config.endpoints.partner);
+ const partner = options.guestPartnerIntake ? origin && origin + '/api/partner-application' : endpoint(config.endpoints.partner);
  if (!partner) issues.push('endpoints.partner');
  if (inquiry && inquiry === partner) issues.push('endpoints must be distinct');
  return issues;

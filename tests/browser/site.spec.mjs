@@ -12,7 +12,7 @@ const fixture='https://intake.test/inquiry';
 const partnerFixture='https://intake.test/partners';
 const endpointHeaders={'access-control-allow-origin':origin,'access-control-allow-headers':'content-type,accept','access-control-allow-methods':'POST, OPTIONS'};
 
-async function useFiles(page,{configured=false}={}) {
+async function useFiles(page,{configured=false,guestPartner=false}={}) {
  await page.route(origin+'/**',async route=>{
   try {
    const uri=new URL(route.request().url()).pathname;
@@ -21,9 +21,14 @@ async function useFiles(page,{configured=false}={}) {
    if (!location.startsWith(resolve('dist')+'/')) return route.abort();
    const content=await readFile(location);
    const extension=location.split('.').pop();
-   const body=configured&&extension==='html'
+   let body=configured&&extension==='html'
     ? content.toString().replace(/data-endpoint(?:="[^"]*")?(?=\s|>)/g,'data-endpoint="'+(uri.includes('/partners/')?partnerFixture:fixture)+'"')
     : content;
+   if(guestPartner && uri.endsWith('/en/partners/') && extension==='html') {
+    body=content.toString()
+     .replace(/data-endpoint(?:="[^"]*")?(?=\s|>)/,'data-endpoint="'+origin+'/api/partner-application" data-turnstile="fixture_site_key"')
+     .replace('</form>','<div data-human-check></div></form>');
+   }
    await route.fulfill({body,contentType:mime[extension] || 'application/octet-stream'});
   } catch {await route.fulfill({status:404,body:'Not found'});}
  });
@@ -185,6 +190,46 @@ test('partner form uses its own endpoint and the default build disables sending'
  await fillRequired(page);
  await btn(page,'Submit application').click();
  await expect(page.getByText('Your application was submitted for review.')).toBeVisible();
+});
+
+test('guest carrier application retains entered fields and reuses the reference after a failed write',async({page})=>{
+ await useFiles(page,{guestPartner:true});
+ await page.route('https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit',route=>route.fulfill({
+  contentType:'text/javascript',body:`
+   let widget;
+   window.turnstile={
+    render(target,options) {
+     widget=options;
+     const check=document.createElement('button');
+     check.type='button';
+     check.textContent='Fixture verification';
+     check.onclick=()=>widget.callback(widget.action);
+     target.append(check);
+     return 'fixture';
+    },
+    reset() {}
+   };`
+ }));
+ const submissions=[];
+ await page.route(origin+'/api/partner-application',async route=>{
+  const submission=route.request().postDataJSON();
+  submissions.push(submission);
+  await route.fulfill(submissions.length===1?{status:503,json:{ok:false}}:{status:200,json:{ok:true,reference:submission.reference}});
+ });
+ await page.goto(path('/en/partners/'));
+ await fillRequired(page);
+ await expect(btn(page,'Submit application')).toBeDisabled();
+ await btn(page,'Fixture verification').click();
+ await btn(page,'Submit application').click();
+ await expect(page.locator('[data-form-error]')).toBeVisible();
+ await expect(byName(page,'company')).toHaveValue('Sample for testing');
+ await expect(btn(page,'Submit application')).toBeDisabled();
+ await btn(page,'Fixture verification').click();
+ await btn(page,'Submit application').click();
+ await expect(page.getByText('Your application was submitted for review.')).toBeVisible();
+ expect(submissions).toHaveLength(2);
+ expect(submissions[1]).toEqual(submissions[0]);
+ expect(submissions[1]).toMatchObject({kind:'partner',turnstileToken:'guest-partner',permission:{privacy:true}});
 });
 
 for(const [name,suffix] of [['home','/'],['inquiry','/povprasevanje/'],['partner','/partnerji/'],['services','/de/leistungen/'],['legal','/en/privacy/']]){
