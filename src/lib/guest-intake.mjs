@@ -1,4 +1,4 @@
-import {cargo,cargoItem,companyFields,countries,customer,grouping,location,oversized,recurringFields,regulated,schedule} from './form-schema.mjs';
+import {cargo,cargoItem,companyFields,countries,customer,grouping,location,oversized,partner,recurringFields,regulated,schedule} from './form-schema.mjs';
 import {cargoTotals,phoneValid,scheduleError} from './form-core.mjs';
 
 const record = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -63,5 +63,14 @@ export function validateGuestInquiry(input,now=new Date()) {
   reference:input.reference,language:input.language,transportCategory:input.transportCategory,contact,pickup,delivery,
   cargo:{type,...goods},schedule:timing,additionalRequirements:{privacy:true,marketing:input.additionalRequirements.marketing,
    manualAssessment:goods.regulated==='yes' || goods.oversized==='yes' || type==='machinery'}
+ };
+}
+
+export function validateGuestPartner(input) {
+ if (!record(input) || input.kind!=='partner' || typeof input.reference!=='string' ||
+     !/^DZT-\d{8}-[A-Z0-9]{6}$/.test(input.reference) || !['sl','en','de'].includes(input.language) ||
+     !record(input.permission) || input.permission.privacy!==true) throw new Error('Invalid application');
+ return {
+  reference:input.reference,language:input.language,application:checked(partner,input.application),permission:{privacy:true}
  };
 }

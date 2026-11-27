@@ -78,3 +78,38 @@ test('portal stays disabled in preview and rejects secret or placeholder keys',(
  vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY='sb_publishable_fixture';
  assert.equal(portalConfiguration(vars,true).manager,false);
 });
+
+test('guest partner handler validates the public form and uses the partner Turnstile action',async t=>{
+ const {onRequest:submitPartner}=await import('../functions/api/partner-application.js');
+ const {partner}=await import('../src/lib/form-schema.mjs');
+ const origin='https://transport.example';
+ const env={
+  DZ_GUEST_PARTNER_INTAKE:'true',DZ_SITE_ORIGIN:origin,TURNSTILE_SECRET:'fixture',DZ_IP_HASH_KEY:'x'.repeat(32),
+  SUPABASE_URL:'https://test-ref.supabase.co',SUPABASE_SECRET_KEY:'fixture'
+ };
+ const application=Object.fromEntries(partner.filter(field=>field.required).map(field=>[field.key,
+  ({country:'SI',email:'partner@example.invalid',tel:'+38640123456'})[field.type] || 'Fixture']));
+ const input={kind:'partner',reference:'DZT-20261127-TEST01',language:'de',application,
+  permission:{privacy:true},turnstileToken:'fixture',role:'admin'};
+ const request=(patch={})=>new Request(origin+'/api/partner-application',{
+  method:'POST',headers:{Origin:origin,'Content-Type':'application/json','CF-Connecting-IP':'192.0.2.12'},
+  body:JSON.stringify({...input,...patch})
+ });
+ let action='guest-inquiry';
+ let databaseCalls=0;
+ t.mock.method(globalThis,'fetch',async(url,options)=>{
+  if(url.includes('siteverify')) return Response.json({success:true,hostname:new URL(origin).hostname,action});
+  databaseCalls++;
+  assert.match(url,/ingest_guest_partner$/);
+  const data=JSON.parse(options.body);
+  assert.deepEqual(data.p_payload,{reference:input.reference,language:'de',application,permission:{privacy:true}});
+  return Response.json('12345678-1234-1234-1234-123456789abc');
+ });
+ assert.equal((await submitPartner({request:request(),env:{...env,DZ_GUEST_PARTNER_INTAKE:false}})).status,404);
+ assert.equal((await submitPartner({request:request({permission:{privacy:false}}),env})).status,400);
+ assert.equal((await submitPartner({request:request(),env})).status,403);
+ assert.equal(databaseCalls,0);
+ action='guest-partner';
+ assert.deepEqual(await (await submitPartner({request:request(),env})).json(),{ok:true,reference:input.reference});
+ assert.equal(databaseCalls,1);
+});

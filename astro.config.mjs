@@ -4,7 +4,8 @@ import company from './config/site.json' with {type:'json'};
 import {assertConfiguration, siteMode, siteUrl} from './src/lib/site-config.mjs';
 
 const guestIntake = process.env.PUBLIC_DZ_GUEST_INTAKE === 'true';
-assertConfiguration(siteMode, company, {guestIntake});
+const guestPartnerIntake = process.env.PUBLIC_DZ_GUEST_PARTNER_INTAKE === 'true';
+assertConfiguration(siteMode, company, {guestIntake, guestPartnerIntake});
 
 export default defineConfig({
   site: siteUrl,
