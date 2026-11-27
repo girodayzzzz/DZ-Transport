@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {portalCopy,portalTitles,statusLabels} from '../../src/lib/portal-copy.ts';
+import {paymentCopy} from '../../src/lib/v8-copy.ts';
 
 const origin='https://portal-test.invalid';
 const project='https://dz-fixture.supabase.co';
@@ -27,7 +28,7 @@ const user={id:'cccccccc-cccc-4ccc-bccc-cccccccccccc',email:'customer@example.in
  email_confirmed_at:'2026-11-26T12:00:00Z',app_metadata:{},user_metadata:{},aud:'authenticated'};
 const secret='synthetic-test-password';
 
-async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='en',v7=false}={}) {
+async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='en',v7=false,v8=false}={}) {
  const paths=Object.fromEntries(Object.entries(v7Routes[lang]).map(([key,path])=>[key,base+'/'+(lang==='sl'?'':lang+'/')+path+'/']));
  const dictionary=localizedLabels(['sl','en','de'].indexOf(lang));
  const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google,onboarding,quickDeal},labels:dictionary,links:paths});
@@ -36,6 +37,11 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
  const calls=[];
  await page.route(origin+'/**',async route=>{
   const url=new URL(route.request().url());
+  if(v8 && url.pathname==='/api/transport-payments') {
+   const data=route.request().postDataJSON();
+   calls.push({path:url.pathname,data});
+   return route.fulfill({status:202,json:{payment:orderId}});
+  }
   const relative=url.pathname.slice(base.length).replace(/^\//,'');
   if(!/^(_astro\/[^/]+\.(js|css)|(?:(?:en|de)\/)?[a-z-]+\/)$/.test(relative)) return route.fulfill({status:404});
   const file=await readFile('dist/'+relative+(relative.endsWith('/')?'index.html':''),'utf8');
@@ -72,6 +78,12 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
     public_load:[{category:'pallet',origin_country:'SI',destination_country:'DE',test_data:true,can_ask:false}],
     public_load_questions:[{question:'Synthetic public question',answer:'Synthetic public answer'}],
     list_load_questions:[],load_publication:null,
+    v8_available:v8,
+    v8_customer_bids:[{id:loadId,inquiry_id:loadReference,amount_minor:50000,currency:'EUR',vat_treatment:'Fixture',
+     valid_until:'2026-12-31',status:'sent'}],
+    transport_payments:[{id:orderId,inquiry_id:loadId,quote_id:loadId,kind:'quote',state:'checkout_pending',
+     gross_minor:50000,commission_minor:5000,currency:'EUR',refunded_minor:0}],
+    payment_activity:[{payment_id:orderId,event:'checkout_pending',created_at:'2026-11-26T12:00:00Z'}],
     user_roles:[{id:'admin'}],manager_counts:[],manager_financials:[],
     partner_applications:[{id:'application',state:'approved'}],my_carrier_plan:'basic',
     transport_inquiries:[{id:loadId,reference:loadReference,origin:'SI',destination:'DE',status:'scheduled'}],
@@ -260,5 +272,31 @@ for(const lang of ['sl','en','de']) test('V7 mobile portal flows · '+lang,async
  await expect(page.getByRole('heading',{name:copy.fees,exact:true})).toBeVisible();
  await expect(page.locator('#inquiries summary').first()).toBeVisible();
  await expect(page.getByRole('heading',{name:copy.chat,exact:true})).toHaveCount(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test('V8 customer can select a payable bid and resume its Stripe Checkout',async({page})=>{
+ const {calls,open,dictionary:copy}=await setup(page,{v7:true,v8:true,quickDeal:true});
+ const paymentLabels=paymentCopy(1);
+ await page.setViewportSize({width:390,height:844});
+ await open('login');
+ await page.getByLabel(copy.email,{exact:true}).fill(user.email);
+ await page.getByLabel(copy.password,{exact:true}).fill(secret);
+ await page.getByRole('button',{name:copy.login,exact:true}).click();
+ const bids=page.locator('#payableBids');
+ await expect(bids.getByText('€500.00')).toBeVisible();
+ await bids.locator('summary').filter({hasText:paymentLabels.payBid}).click();
+ await bids.getByRole('button',{name:paymentLabels.payBid}).click();
+ await expect.poll(()=>calls.filter(call=>call.path==='/api/transport-payments').length).toBe(1);
+ expect(calls.find(call=>call.path==='/api/transport-payments').data).toMatchObject({
+  action:'checkout',kind:'quote',target:loadId
+ });
+ const payments=page.locator('#payments');
+ await payments.locator('summary').filter({hasText:paymentLabels.checkout_pending}).click();
+ await payments.getByRole('button',{name:paymentLabels.resumePayment}).click();
+ await expect.poll(()=>calls.filter(call=>call.path==='/api/transport-payments').length).toBe(2);
+ expect(calls.filter(call=>call.path==='/api/transport-payments').at(-1).data).toMatchObject({
+  action:'checkout',kind:'quote',target:loadId,request:orderId
+ });
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

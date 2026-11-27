@@ -1,6 +1,7 @@
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {cargo,cargoItem,companyFields,consents,customer as customerFields,location,oversized,recurringFields,regulated,schedule,types} from './form-schema.mjs';
 import type {Field} from './portal';
+import {paymentCopy} from './v8-copy';
 
 type Context = {
  client:SupabaseClient;
@@ -21,6 +22,11 @@ type Columns = [string,string][];
 export async function mountDashboard({client,page,body,labels,form,show,el,unwrap,userId,quickDeal,loadUrl}:Context) {
  const text=(key:string)=>labels[key] || key;
  const language=['sl','en','de'].indexOf(document.documentElement.lang);
+ const v8Labels=paymentCopy(language);
+ Object.assign(v8Labels, {in_transit:labels.in_transit || v8Labels.in_transit});
+ labels={...labels,...v8Labels};
+ let paymentsEnabled=false;
+ let paymentRows:Row[]=[];
  const inquiryFieldLabels=new Map([...customerFields,...location('pickup'),...location('delivery'),...Object.values(cargo).flat(),
   ...cargoItem,...companyFields,...recurringFields,...schedule,...consents,regulated,oversized].map(field=>[field.key,field.labels[language]]));
  const cell=(key:string,value:Row[string])=>{
@@ -107,6 +113,39 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
  let receipt:string|undefined;
 
 
+ const paymentRequests=new Map<string,{fingerprint:string;id:string}>();
+ function requestId(key:string,payload:unknown) {
+  const fingerprint=JSON.stringify(payload);
+  const previous=paymentRequests.get(key);
+  if(previous && previous.fingerprint===fingerprint) return previous.id;
+  const id=crypto.randomUUID();
+  paymentRequests.set(key,{fingerprint,id});
+  return id;
+ }
+ async function paymentAPI(input:Record<string,unknown>) {
+  const {data,error}=await client.auth.getSession();
+  if(error || !data.session) throw new Error(labels.error);
+  const response=await fetch('/api/transport-payments',{
+   method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+data.session.access_token},
+   body:JSON.stringify({...input,language:document.documentElement.lang})
+  });
+  if(!response.ok) throw new Error(labels.error);
+  return response.json();
+ }
+ async function checkout(kind:string,target:string|null,details?:Record<string,unknown>,existing?:string) {
+  const result=await paymentAPI({action:'checkout',kind,target,details,request:existing || requestId(kind+target,details)});
+  if(result.url) window.location.assign(result.url);
+  else {
+   await refresh();
+   show(labels.paymentPending);
+  }
+ }
+ const euroAmount=(name:string,min=.01,max=999999.99)=>field(name,'euroAmount',{type:'number',min,max,step:.01});
+ const inCents=(data:FormData,name:string)=>Math.round(Number(read(data,name))*100);
+ const asMoney=(amount:unknown)=>typeof amount==='number' ? new Intl.NumberFormat(document.documentElement.lang,{
+  style:'currency',currency:'EUR'
+ }).format(amount/100) : '—';
+
  async function customer() {
   const [inquiries,quotes,orders,history,profiles]=await Promise.all([
    unwrapQuery('transport_inquiries','id,reference,origin,destination,status','customer_id',userId),
@@ -141,10 +180,35 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
    });
   }
   table(section('offers'),related(quotes.filter(row=>row.opportunity_id===null && row.status!=='draft')),quoteColumns,(parent,row)=>{
-   if(row.status!=='sent') return;
+   if(row.status!=='sent' || paymentsEnabled) return;
    parent.append(el('p',labels.acceptHelp));
    action(parent,'accept',[],async()=>{await rpc('accept_customer_offer',{p_quote:row.id});});
   });
+  if(paymentsEnabled) {
+   const bids=await rpc('v8_customer_bids',{}) as Row[];
+   const bidColumns:Columns=[['inquiry_id','inquiries'],['amount_minor','euroAmount'],['vat_treatment','vat'],['valid_until','valid']];
+   table(section('payableBids'),bids.map(row=>({...row,amount_minor:asMoney(row.amount_minor)})),bidColumns,(parent,row)=>{
+    action(parent,'payBid',[],async()=>checkout('quote',String(row.id)));
+   });
+   if(quickDeal) {
+    const panel=section('payQuickDeal');
+    panel.append(el('p',labels.quickDealRegions));
+    form(panel,[
+     field('origin','origin'),field('destination','destination'),field('description','description',{type:'textarea',max:4000}),
+     field('category','cargo',{max:120}),euroAmount('amount',.5),
+     field('pickupStart','quickDealPickupFrom',{type:'date'}),field('pickupEnd','quickDealPickupTo',{type:'date'}),
+     field('deliveryStart','quickDealDeliveryFrom',{type:'date'}),field('deliveryEnd','quickDealDeliveryTo',{type:'date'}),
+     field('vehicle','quickDealVehicle',{max:500}),field('weight','quickDealWeight',{type:'number',min:.01,max:1000000,step:.01}),
+     field('dimensions','quickDealDimensions',{max:500}),field('vat','vat'),field('requirements','quickDealRequirements',{max:1500})
+    ],labels.payQuickDeal,async data=>{
+     await checkout('quick_deal',null,{
+      ...Object.fromEntries(data.entries()),amount:inCents(data,'amount'),
+      pickup:'['+read(data,'pickupStart')+','+read(data,'pickupEnd')+']',
+      delivery:'['+read(data,'deliveryStart')+','+read(data,'deliveryEnd')+']'
+     });
+    });
+   }
+  }
   table(section('orders'),related(orders),orderColumns,(parent,row)=>chatLink(parent,row.id));
   table(section('history'),related(history),historyColumns);
  }
@@ -194,7 +258,9 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
     if(['available','reserved','acceptance_requested'].includes(String(row.status))) {
      showFee(parent,Number(row.carrier_minor),String(row.currency),carrierPlan);
      action(parent,row.has_requested ? 'acceptFeeTerms' : 'quickDealRequest',[acceptTerms],async()=>{
-      await rpc('request_quick_deal',{p_deal:row.id,p_amount:row.carrier_minor,p_currency:row.currency,p_plan:carrierPlan});
+      const payable=paymentsEnabled && await rpc('v8_is_quick_deal',{p_deal:row.id});
+      if(payable) await rpc('v8_accept_quick_deal',{p_deal:row.id,p_amount:row.carrier_minor,p_plan:carrierPlan});
+      else await rpc('request_quick_deal',{p_deal:row.id,p_amount:row.carrier_minor,p_currency:row.currency,p_plan:carrierPlan});
      });
     }
    });
@@ -223,7 +289,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   });
  }
 
- function manageDeal(parent:HTMLElement,deal:Row,order:Row|undefined,partners:[string,string][]) {
+ function manageDeal(parent:HTMLElement,deal:Row,order:Row|undefined,partners:[string,string][],managedPayment=false) {
   table(parent,[deal],dealColumns);
   showDealDetails(parent,deal);
   if(!['draft','available','acceptance_requested','reserved'].includes(String(deal.status))) return;
@@ -232,7 +298,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
    const carrier=partners.find(([id])=>id===deal.reserved_partner)?.[1];
    if(carrier) parent.append(el('p',carrier+' · '+cell('reserved_until',deal.reserved_until)));
   }
-  if(deal.status==='draft') {
+  if(deal.status==='draft' && !managedPayment) {
    action(parent,'quickDealPublish',[],async()=>{await rpc('publish_quick_deal',{p_deal:deal.id});});
   }
   if(partners.length) action(parent,'quickDealAttest',[
@@ -241,7 +307,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
    await rpc('attest_quick_deal_eligibility',{p_deal:deal.id,p_partner:read(data,'partner'),
     p_eligible_until:new Date(read(data,'until')).toISOString()});
   });
-  if(deal.status!=='draft') {
+  if(deal.status!=='draft' && !managedPayment) {
    const requests=el('div');
    form(parent,[],labels.quickDealRequests,async()=>{
     const candidates=await rpc('quick_deal_requests',{p_deal:deal.id}) as Row[];
@@ -252,12 +318,12 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
    });
    parent.append(requests);
   }
-  if(deal.status==='reserved' && order) {
+  if(!managedPayment && deal.status==='reserved' && order) {
    action(parent,'quickDealAssign',[field('instructions','instructions',{type:'textarea',max:4000})],async data=>{
     await rpc('assign_quick_deal',{p_deal:deal.id,p_order:order.id,p_instructions:read(data,'instructions'),p_contract_confirmed:true});
    });
   }
-  action(parent,'quickDealCancel',[],async()=>{await rpc('cancel_quick_deal',{p_deal:deal.id});});
+  if(!managedPayment) action(parent,'quickDealCancel',[],async()=>{await rpc('cancel_quick_deal',{p_deal:deal.id});});
  }
 
  async function carrier() {
@@ -424,15 +490,17 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
      unwrap(await client.from('internal_notes').insert({inquiry_id:row.id,body:read(data,'body')}));
     });
     const current=String(row.status);
-    const next=[managerSteps[current],...(!['delivered','completed','cancelled'].includes(current) ? ['cancelled'] : [])].filter(Boolean);
+    const payment=paymentRows.find(entry=>entry.inquiry_id===row.id && entry.state!=='expired' && !entry.superseded);
+    const next=payment ? [] : [managerSteps[current],...(!['delivered','completed','cancelled'].includes(current) ? ['cancelled'] : [])].filter(Boolean);
     if(next.length) action(details,'update',[field('next','status',{options:options(next)})],async data=>{
      await rpc('advance_transport',{p_inquiry:row.id,p_next:read(data,'next')});
     });
     const order=orders.find(order=>order.inquiry_id===row.id);
     const deal=quickDeals.find(deal=>deal.reference===row.reference);
     const activeDeal=deal && ['available','acceptance_requested','reserved'].includes(String(deal.status));
-    if(deal) manageDeal(details,deal,order,partnerOptions);
-    if(!deal && current==='awaiting_carrier_offer') {
+    const managedQuickDeal=Boolean(payment?.kind==='quick_deal');
+    if(deal) manageDeal(details,deal,order,partnerOptions,managedQuickDeal);
+    if(current==='awaiting_carrier_offer' && (!deal || (managedQuickDeal && payment?.state==='paid'))) {
      const countries=new Intl.DisplayNames([document.documentElement.lang],{type:'region'});
      const countryOptions=['SI','AT','DE','IT','HR','HU','FR','NL','BE','CH','GB','PL','CZ','SK']
       .map(code=>[code,countries.of(code) ?? code] as [string,string]);
@@ -445,9 +513,9 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
       await rpc('publish_load',{p_inquiry:row.id,p_category:read(data,'category'),p_origin:read(data,'origin'),
        p_destination:read(data,'destination'),p_test:read(data,'test')==='testListing',p_published:read(data,'visibility')==='publicListing'});
      });
-     if(quickDeal) draftDeal(details,row);
+     if(quickDeal && !deal && !payment) draftDeal(details,row);
     }
-    if(order && partnerOptions.length && ['customer_accepted','carrier_assigned','scheduled'].includes(current)) {
+    if(!payment && order && partnerOptions.length && ['customer_accepted','carrier_assigned','scheduled'].includes(current)) {
      action(details,'proposeFeeTerms',[field('partner','partner',{options:partnerOptions})],async data=>{
       await rpc('propose_carrier_fee_terms',{p_order:order.id,p_partner:read(data,'partner')});
      });
@@ -457,7 +525,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
      ],async data=>{await rpc('replace_transport_carrier',{p_order:order.id,p_partner:read(data,'partner'),
       p_instructions:read(data,'instructions'),p_reason:read(data,'reason')});});
     }
-    if(current==='awaiting_carrier_offer') {
+    if(current==='awaiting_carrier_offer' && !payment) {
      if(partnerOptions.length && !activeDeal) action(details,'invite',[
       field('partner','partner',{options:partnerOptions}),field('summary','description',{type:'textarea',max:1500})
      ],async data=>{await rpc('invite_partner',{p_inquiry:row.id,p_partner:read(data,'partner'),p_summary:read(data,'summary')});});
@@ -465,7 +533,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
       await rpc('prepare_customer_offer',{p_inquiry:row.id,...money(data),p_carrier:Number(read(data,'carrier')),p_expenses:Number(read(data,'expenses'))});
      });
     }
-    if(current==='customer_accepted' && order && partnerOptions.length && !activeDeal) {
+    if(!payment && current==='customer_accepted' && order && partnerOptions.length && !activeDeal) {
      action(details,'assign',[field('partner','partner',{options:partnerOptions}),field('instructions','instructions',{type:'textarea',max:4000})],async data=>{
       await rpc('assign_transport',{p_order:order.id,p_partner:read(data,'partner'),p_instructions:read(data,'instructions')});
      });
@@ -598,7 +666,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
  }
  async function feesPanel() {
   const panel=section('fees');
-  panel.append(el('p',labels.feesHelp));
+  panel.append(el('p',paymentsEnabled ? labels.legacyFees : labels.feesHelp));
   if(page==='carrier') {
    const terms=await rows('carrier_fee_terms','id,order_id,plan,amount_minor,currency,accepted_at');
    panel.append(el('p',labels.feePlan+' · '+text(carrierPlan)));
@@ -665,11 +733,214 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   return unwrap(await client.from(table).select(columns).eq(key,value).order('created_at',{ascending:false}).limit(100)) as unknown as Row[];
  }
 
+ function download(name:string,content:BlobPart,type:string) {
+  const url=URL.createObjectURL(new Blob([content],{type}));
+  const anchor=el('a');
+  anchor.href=url;
+  anchor.download=name;
+  anchor.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }
+ const csvCell=(value:unknown)=>'"'+String(value ?? '').replaceAll('"','""')+'"';
+ const paymentAction=(row:Row,key:string,reason:string|null=null,amount:number|null=null)=>
+  rpc('v8_payment_action',{p_payment:row.id,p_action:key,p_reason:reason,p_amount:amount});
+
+ async function stripeBalance(panel:HTMLElement) {
+  const content=el('div');
+  panel.append(content);
+  const load=async()=>{
+   const status=await paymentAPI({action:'status'});
+   content.replaceChildren();
+   if(!status.connected) return;
+   content.append(el('p',labels[status.transfers?'transfersReady':'transfersBlocked']+' · '+
+    labels[status.payouts?'payoutsReady':'payoutsBlocked']));
+   if(status.requirements.length) content.append(el('p',status.requirements.join(', ')));
+   if(status.disabledReason) content.append(el('p',status.disabledReason));
+   content.append(el('p',labels.balanceAvailable+' '+asMoney(status.available)+' · '+labels.balancePending+' '+asMoney(status.pending)));
+   action(content,'payoutSchedule',[field('schedule','payoutSchedule',{options:options(['weekly','monthly','manual']),value:status.schedule})],async data=>{
+    const schedule=read(data,'schedule');
+    const result=await paymentAPI({action:'schedule',schedule,request:requestId('schedule',schedule)});
+    if(!result.pending) paymentRequests.delete('schedule');
+   });
+   if(status.schedule==='manual' && status.payouts && status.available>0) {
+    action(content,'payoutRequest',[euroAmount('amount',.01,status.available/100)],async data=>{
+     const amount=inCents(data,'amount');
+     const result=await paymentAPI({action:'payout',amount,request:requestId('payout',amount)});
+     if(!result.pending) paymentRequests.delete('payout');
+    });
+   }
+   table(content,status.history.map((row:{amount:number;date:number})=>({...row,amount:asMoney(row.amount),
+    created_at:new Date(row.date*1000).toISOString()})),[['amount','amount'],['status','status'],['created_at','date'],['failure','reason']]);
+  };
+  form(panel,[],labels.connectStripe,async()=>{
+   const result=await paymentAPI({action:'connect'});
+   if(result.url) window.location.assign(result.url);
+   else show(labels.operationPending);
+  });
+  await load().catch(()=>content.replaceChildren(el('p',labels.error)));
+ }
+
+ async function paymentsPanel() {
+  const panel=section('payments');
+  panel.append(el('p',labels.testPayments));
+  for(const row of paymentRows) {
+   const item=el('details');
+   item.id='payment-'+row.id;
+   item.append(el('summary',[String(row.id),text(String(row.state)),asMoney(row.gross_minor)].join(' · ')));
+   panel.append(item);
+   if(page!=='customer' && row.commission_minor!==null) {
+    const gross=Number(row.gross_minor);
+    const remaining=gross-Number(row.refunded_minor);
+    const beforeExpenses=remaining-Number(row.commission_minor);
+    const terms=row.terms as unknown as {stripe_fee_payer:string};
+    const expenses=terms.stripe_fee_payer==='carrier' ? Math.min(Math.max(0,beforeExpenses),
+     Math.round(remaining*Number(row.processor_fee_minor)/gross)) : 0;
+    const net=beforeExpenses-expenses;
+    item.append(el('p',[
+     row.rate+' %',labels.feeAmount+' '+asMoney(row.commission_minor),labels.feeNet+' '+asMoney(net),
+     text(row.settled_at?'commission_settled':'commissionWaiting')
+    ].join(' · ')));
+   }
+   if(Number(row.refunded_minor)>0) item.append(el('p',labels.refund+' '+asMoney(row.refunded_minor)));
+   if(page==='manager' && ['delivery_dispute','cancellation_requested'].includes(String(row.review_reason))
+    && ['paid','partially_refunded'].includes(String(row.state)) && !row.card_dispute)
+    action(item,'dismissPaymentReview',[field('reason','reason',{max:4000})],async data=>{
+     await paymentAction(row,'dismiss',read(data,'reason'));
+    });
+   if(row.review_reason) item.append(el('p',text(String(row.review_reason))));
+   if(row.card_dispute) item.append(el('p',labels.card_dispute));
+   if(page==='manager' && ['checkout_pending','payment_failed'].includes(String(row.state)) && !row.review_reason)
+    action(item,'paymentCancel',[field('reason','reason',{max:4000})],async data=>{
+     await paymentAction(row,'cancel',read(data,'reason'));
+    });
+   if(page==='customer' && ['checkout_pending','payment_failed'].includes(String(row.state)) && !row.review_reason) {
+    form(item,[],labels.resumePayment,async()=>checkout(String(row.kind),row.quote_id ? String(row.quote_id) : null,undefined,String(row.id)));
+    action(item,'paymentCancel',[],async()=>{await paymentAction(row,'cancel');});
+   }
+   if(['paid','partially_refunded'].includes(String(row.state))) {
+    if(page==='customer' && !row.confirmed_at && row.state==='paid') action(item,'paymentCancel',[],async()=>{await paymentAction(row,'cancel');});
+    if(page!=='manager' && !row.confirmed_at && !row.delivery_dispute)
+     action(item,'paymentDispute',[field('reason','reason',{max:4000})],async data=>{await paymentAction(row,'dispute',read(data,'reason'));});
+    if(row.delivered_at && !row.confirmed_at && !row.card_dispute && (page==='manager' || (page==='customer' && !row.review_reason)))
+     action(item,'confirmDelivery',page==='manager'?[field('reason','reason',{max:4000})]:[],async data=>{
+      await paymentAction(row,'confirm',page==='manager'?read(data,'reason'):null);
+     });
+    if(page==='manager' && !row.card_dispute) {
+     const remainder=Number(row.gross_minor)-Number(row.refunded_minor);
+     const terms=row.terms as unknown as {cancellation_fee_bps:number};
+     const fee=row.review_reason==='cancellation_requested' ? Math.round(Number(row.gross_minor)*terms.cancellation_fee_bps/10000) : 0;
+     const refund=euroAmount('amount',.01,remainder/100);
+     refund.value=String(Math.max(0,remainder-fee)/100);
+     action(item,'paymentRefund',[refund,field('reason','reason',{max:4000})],async data=>{
+      await paymentAction(row,'refund',read(data,'reason'),inCents(data,'amount'));
+     });
+    }
+   }
+   if(page!=='carrier') {
+    const details=el('div');
+    item.append(details);
+    const load=async()=>{
+     const record=await rpc('v8_payment_details',{p_payment:row.id}) as {
+      receipt?:string;operations?:Row[];decisions?:Row[]
+     } | null;
+     details.replaceChildren();
+     if(record?.receipt && new URL(record.receipt).origin==='https://pay.stripe.com') {
+      const receipt=link(details,record.receipt,'paymentReceipt');
+      receipt.rel='noopener noreferrer';
+     }
+     if(record?.decisions?.length) table(details,record.decisions,[['event','status'],['reason','reason'],['created_at','date']]);
+     if(record?.operations?.length) table(details,record.operations,[['kind','update'],['status','status'],['error','reason']],(cell,op)=>{
+      if(op.error && op.status==='running') action(cell,'retryPayment',[field('reason','reason',{max:4000})],async data=>{
+       await rpc('v8_retry_payment_operation',{p_operation:op.id,p_reason:read(data,'reason')});
+      });
+     });
+    };
+    item.addEventListener('toggle',()=>{if(item.open) void load().catch(()=>details.replaceChildren(el('p',labels.error)));});
+   }
+   if(page==='carrier' && row.commission_minor!==null) form(item,[],labels.commissionDraft,async()=>{
+    download('commission-draft-'+row.id+'.txt',[
+     labels.commissionDraft,String(row.id),labels.feeBase+' '+asMoney(row.gross_minor),
+     labels.feeAmount+' '+asMoney(row.commission_minor),labels.vat+' '+asMoney(row.vat_minor),
+     text(row.settled_at?'commission_settled':'commissionWaiting')
+    ].join('\n'),'text/plain;charset=utf-8');
+   });
+   if(row.confirmed_at || row.delivered_at) {
+    const documents=el('div');
+    item.append(documents);
+    form(documents,[],labels.invoiceDownload,async()=>{
+     const encoded=await rpc('v8_transport_invoice',{p_payment:row.id,p_content:null}) as string|null;
+     if(!encoded) {show(labels.empty);return;}
+     download('transport-invoice-'+row.id+'.pdf',Uint8Array.from(atob(encoded),value=>value.charCodeAt(0)),'application/pdf');
+    });
+    if(page==='carrier') {
+     const upload=form(documents,[],labels.invoiceUpload,async data=>{
+      const file=data.get('invoice');
+      if(!(file instanceof File) || !file.size || file.size>2*1024*1024 || file.type!=='application/pdf') throw new Error(labels.error);
+      const reader=new FileReader();
+      const encoded=await new Promise<string>((resolve,reject)=>{
+       reader.onload=()=>resolve(String(reader.result).split(',')[1]);
+       reader.onerror=reject;
+       reader.readAsDataURL(file);
+      });
+      await rpc('v8_transport_invoice',{p_payment:row.id,p_content:encoded});
+      upload.reset();
+     });
+     const attachment=el('input');
+     attachment.type='file';
+     attachment.name='invoice';
+     attachment.accept='application/pdf';
+     attachment.required=true;
+     const label=el('label',labels.invoiceUpload);
+     label.append(attachment);
+     upload.prepend(label);
+    }
+   }
+  }
+  if(page==='carrier') await stripeBalance(section('payoutActivity'));
+  if(page==='manager') {
+   const payouts=await rpc('v8_admin_payouts',{}) as Row[];
+   table(section('payoutActivity'),payouts.map(row=>({...row,amount_minor:asMoney(row.amount_minor)})),
+    [['partner_id','partner'],['amount_minor','amount'],['state','status'],['failure','reason'],['created_at','date']]);
+  }
+  if(page!=='customer') {
+   const monthly=section('monthlyStatement');
+   const month=new Date().toISOString().slice(0,7);
+   const statement=el('div');
+   form(monthly,[field('month','monthlyStatement',{type:'month',value:month})],labels.exportStatement,async data=>{
+    const monthKey=read(data,'month');
+    const entries:Row[]=[];
+    for(let first=0;;first+=100) {
+     const batch=unwrap(await client.rpc('v8_monthly_statement',{p_month:monthKey+'-01'}).range(first,first+99)) as Row[];
+     entries.push(...batch);
+     if(batch.length<100) break;
+    }
+    statement.replaceChildren();
+    table(statement,entries.map(row=>({...row,gross_minor:asMoney(row.gross_minor),fee_minor:asMoney(row.fee_minor),
+     net_minor:asMoney(row.net_minor),refunded_minor:asMoney(row.refunded_minor)})),[
+     ['payment_id','reference'],['gross_minor','feeBase'],['fee_minor','feeAmount'],['net_minor','feeNet'],
+     ['refunded_minor','refund'],['settlement','status']
+    ],(cell,row)=>{
+     if(document.getElementById('payment-'+row.payment_id)) link(cell,'#payment-'+row.payment_id,'details');
+    });
+    const keys=['payment_id','partner_id','currency','gross_minor','rate','fee_minor','vat_minor','expenses_minor','net_minor','refunded_minor','settlement','commission_draft','transport_invoice'];
+    download('dz-transport-'+monthKey+'.csv',[keys.join(','),...entries.map(row=>keys.map(key=>csvCell(row[key])).join(','))].join('\r\n'),
+     'text/csv;charset=utf-8');
+   });
+   monthly.append(statement);
+  }
+  const notices=await rows('payment_activity','payment_id,event,created_at');
+  table(section('paymentAlerts'),notices,[['payment_id','reference'],['event','notifications'],['created_at','date']]);
+ }
+
  async function refresh() {
 
   body.replaceChildren();
   show(labels.working);
   try {
+   const availability=await client.rpc('v8_available');
+   paymentsEnabled=!availability.error && availability.data===true;
+   paymentRows=paymentsEnabled ? await rows('transport_payments',
+    'id,inquiry_id,quote_id,kind,state,gross_minor,currency,plan,rate,commission_minor,vat_minor,processor_fee_minor,terms,refunded_minor,delivered_at,confirmed_at,review_reason,settled_at,delivery_dispute,card_dispute,superseded,created_at') : [];
    if(page!=='manager') conversations=await rows('transport_conversations','id,order_id,reference');
    if(page==='customer') await customer();
    if(page==='carrier') await carrier();
@@ -682,6 +953,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
     if(chat) link(parent,'#chat-'+chat.id,String(chat.reference));
     if(!row.read_at) action(parent,'markRead',[],async()=>{await rpc('mark_notification_read',{p_notification:row.id});});
    });
+   if(paymentsEnabled) await paymentsPanel();
    const nav=el('nav');
    nav.setAttribute('aria-label',labels.overview);
    for(const article of body.querySelectorAll<HTMLElement>(':scope > article[id]')) link(nav,'#'+article.id,article.id);
