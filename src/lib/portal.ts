@@ -60,6 +60,7 @@ export async function mountPortal(root:HTMLElement) {
    input.name=field.name;
    input.required=!field.optional;
    if(field.value!==undefined) input.value=field.value;
+   if (field.type==='checkbox') label.classList.add('portal-checkbox');
    label.append(input);
    node.append(label);
   }
@@ -97,6 +98,43 @@ export async function mountPortal(root:HTMLElement) {
 
  try {
   show('');
+  if(page==='load') {
+   const id=new URLSearchParams(location.search).get('id');
+   if(!id || !/^[a-f0-9-]{36}$/i.test(id)) {show(labels.loadUnavailable);return;}
+   for(const anchor of document.querySelectorAll<HTMLAnchorElement>('a[data-language]')) {
+    const destination=new URL(anchor.href);
+    destination.searchParams.set('id',id);
+    anchor.href=destination.href;
+   }
+   const load=unwrap(await client.rpc('public_load',{p_load:id}))[0];
+   if(!load) {show(labels.loadUnavailable);return;}
+   const countries=new Intl.DisplayNames([document.documentElement.lang],{type:'region'});
+   body.append(el('p',[labels[load.category] ?? load.category,countries.of(load.origin_country),countries.of(load.destination_country)].join(' · ')));
+   if(load.test_data) body.append(el('p',labels.testListing));
+   const list=el('section');
+   list.append(el('h2',labels.questions));
+   body.append(list);
+   const published=unwrap(await client.rpc('public_load_questions',{p_load:id})) as {question:string;answer:string|null}[];
+   if(!published.length) list.append(el('p',labels.empty));
+   for(const row of published) {
+    const card=el('article');
+    card.append(el('h3',row.question));
+    if(row.answer) card.append(el('p',row.answer));
+    list.append(card);
+   }
+   if(load.can_ask) {
+    list.append(el('p',labels.publicQuestionHelp));
+    const result=el('p');
+    result.setAttribute('role','status');
+    const ask=form(list,[{name:'body',label:labels.question,type:'textarea',max:1000}],labels.ask,async data=>{
+     unwrap(await client.rpc('ask_load_question',{p_load:id,p_public:true,p_body:value(data,'body')}));
+     ask.reset();
+     result.textContent=labels.questionReceived;
+    });
+    list.append(result);
+   }
+   return;
+  }
   if (['callback','verify'].includes(page)) {
    const query=new URLSearchParams(location.search);
    const fragment=new URLSearchParams(location.hash.slice(1));
@@ -262,7 +300,7 @@ export async function mountPortal(root:HTMLElement) {
      return;
     }
    }
-   await mountDashboard({client,page,body,labels,form,show,el,unwrap,userId:user.id,quickDeal:configuration.quickDeal});
+   await mountDashboard({client,page,body,labels,form,show,el,unwrap,userId:user.id,quickDeal:configuration.quickDeal,loadUrl:links.load});
   }
  } catch {
   show(labels.error);

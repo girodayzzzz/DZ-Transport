@@ -18,7 +18,7 @@ set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"50000000-0000-0000-0000-000000000004","aal":"aal2"}',true);
 select public.draft_quick_deal('51000000-0000-0000-0000-000000000001','Pallets','SI','DE',
  daterange(current_date+2,current_date+3),daterange(current_date+4,current_date+5),'Box van',700,'1.2 × 0.8 × 1 m',
- 50000,'EUR','Fixture VAT','','Valid carrier insurance',clock_timestamp()+interval '1 day') as deal \gset
+ 100000,'EUR','Fixture VAT','','Valid carrier insurance',clock_timestamp()+interval '1 day') as deal \gset
 select set_config('dz_test.deal',:'deal',true);
 do $$
 begin
@@ -57,14 +57,14 @@ do $$
 begin
  if exists(select 1 from public.list_quick_deals()) then raise exception 'Unattested partner read'; end if;
  begin
-  perform public.request_quick_deal(current_setting('dz_test.deal')::uuid);
+  perform public.request_quick_deal(current_setting('dz_test.deal')::uuid,100000,'EUR','free');
   raise exception 'Unattested partner requested' using errcode='XX000';
  exception when raise_exception then null; end;
 end $$;
 select set_config('request.jwt.claims','{"sub":"50000000-0000-0000-0000-000000000002","aal":"aal1"}',true);
 do $$
 begin
- if not exists(select 1 from public.list_quick_deals() where carrier_minor=50000 and status='available')
+ if not exists(select 1 from public.list_quick_deals() where carrier_minor=100000 and status='available')
  or exists(select 1 from public.transport_inquiries)
  or exists(select 1 from public.quick_deal_requests(current_setting('dz_test.deal')::uuid)) then
   raise exception 'Carrier projection invalid';
@@ -72,14 +72,15 @@ begin
  begin perform id from dz_private.quick_deal_candidates; raise exception 'Direct candidate access';
  exception when insufficient_privilege then null; end;
 end $$;
-select public.request_quick_deal(:'deal');
-select public.request_quick_deal(:'deal');
+select public.request_quick_deal(:'deal',100000,'EUR','free');
+select public.request_quick_deal(:'deal',100000,'EUR','free');
 select set_config('request.jwt.claims','{"sub":"50000000-0000-0000-0000-000000000003","aal":"aal1"}',true);
-select public.request_quick_deal(:'deal');
+select public.request_quick_deal(:'deal',100000,'EUR','free');
 select set_config('request.jwt.claims','{"sub":"50000000-0000-0000-0000-000000000004","aal":"aal2"}',true);
 select public.reserve_quick_deal(:'deal','50000000-0000-0000-0000-000000000002');
 do $$
 begin
+ if exists(select from public.carrier_fees) then raise exception 'Reservation created a fee'; end if;
  if (select count(*) from public.notifications where event='quick_deal_requested')<>2 then
   raise exception 'Request retries duplicated notifications';
  end if;
@@ -90,6 +91,10 @@ begin
 end $$;
 
 reset role;
+do $$
+begin
+ if exists(select from public.transport_conversations) then raise exception 'Reservation opened a conversation'; end if;
+end $$;
 update dz_private.quick_deals set reserved_until=clock_timestamp()-interval '1 second' where id=:'deal';
 set local role authenticated;
 select public.reserve_quick_deal(:'deal','50000000-0000-0000-0000-000000000003');
@@ -124,12 +129,14 @@ do $$
 begin
  if (select count(*) from public.transport_assignments where order_id=current_setting('dz_test.order')::uuid)<>1
  or not exists(select 1 from public.list_quick_deals() where status='assigned')
- or not exists(select 1 from public.quote_costs where carrier_minor=50000)
+ or not exists(select 1 from public.quote_costs where carrier_minor=100000)
  or not exists(select 1 from public.audit_logs where entity='quick_deals') then raise exception 'Assignment verification failed'; end if;
 end $$;
 select set_config('request.jwt.claims','{"sub":"50000000-0000-0000-0000-000000000003","aal":"aal1"}',true);
 do $$
 begin
+ if (select count(*) from public.carrier_fees where base_minor=100000 and fee_minor=10000 and plan='free')<>1
+ or (select count(*) from public.transport_conversations)<>1 then raise exception 'Quick Deal fee or chat missing'; end if;
  if (select count(*) from public.notifications where event='quick_deal_reserved')<>1
  or not exists(select 1 from public.notifications where event='status_changed')
  or exists(select 1 from public.transport_quotes)

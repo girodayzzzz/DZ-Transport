@@ -13,11 +13,12 @@ type Context = {
  unwrap:<T>(response:{data:T;error:unknown})=>T;
  userId:string;
  quickDeal?:boolean;
+ loadUrl:string;
 };
 type Row = Record<string,string|number|boolean|null>;
 type Columns = [string,string][];
 
-export async function mountDashboard({client,page,body,labels,form,show,el,unwrap,userId,quickDeal}:Context) {
+export async function mountDashboard({client,page,body,labels,form,show,el,unwrap,userId,quickDeal,loadUrl}:Context) {
  const text=(key:string)=>labels[key] || key;
  const language=['sl','en','de'].indexOf(document.documentElement.lang);
  const inquiryFieldLabels=new Map([...customerFields,...location('pickup'),...location('delivery'),...Object.values(cargo).flat(),
@@ -45,6 +46,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
  const options=(values:string[]):[string,string][]=>values.map(value=>[value,text(value)]);
  const section=(key:string)=>{
   const article=el('article');
+  article.id=key;
   article.append(el('h2',text(key)));
   body.append(article);
   return article;
@@ -130,13 +132,20 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
    inquiryRequest=undefined;
    await refresh();
   });
-  table(section('inquiries'),inquiries,inquiryColumns);
+  for(const [key,archived] of [['inProgress',false],['pastTransports',true]] as const) {
+   table(section(key),inquiries.filter(row=>['completed','cancelled'].includes(String(row.status))===archived),inquiryColumns,(parent,row)=>{
+    if(row.status==='offer_sent') link(parent,'#offers','nextAction');
+    const order=orders.find(order=>order.inquiry_id===row.id);
+    if(order && conversations.some(chat=>chat.order_id===order.id)) chatLink(parent,order.id);
+    questionPanel(parent,String(row.id),true,false);
+   });
+  }
   table(section('offers'),related(quotes.filter(row=>row.opportunity_id===null && row.status!=='draft')),quoteColumns,(parent,row)=>{
    if(row.status!=='sent') return;
    parent.append(el('p',labels.acceptHelp));
    action(parent,'accept',[],async()=>{await rpc('accept_customer_offer',{p_quote:row.id});});
   });
-  table(section('orders'),related(orders),orderColumns);
+  table(section('orders'),related(orders),orderColumns,(parent,row)=>chatLink(parent,row.id));
   table(section('history'),related(history),historyColumns);
  }
 
@@ -173,8 +182,20 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
    listings.replaceChildren();
    table(listings,deals.filter(row=>status==='all' || row.status===status),dealColumns,(parent,row)=>{
     showDealDetails(parent,row);
-    if(!row.has_requested && (row.status==='available' || row.status==='reserved')) {
-     action(parent,'quickDealRequest',[],async()=>{await rpc('request_quick_deal',{p_deal:row.id});});
+    const questions=el('details');
+    questions.append(el('summary',labels.questions));
+    form(questions,[],labels.details,async()=>{
+     const inquiry=await rpc('quick_deal_load',{p_deal:row.id}) as string|null;
+     if(!inquiry) throw new Error(labels.error);
+     questions.replaceChildren(el('summary',labels.questions));
+     renderQuestions(questions,inquiry,false,true);
+    });
+    parent.append(questions);
+    if(['available','reserved','acceptance_requested'].includes(String(row.status))) {
+     showFee(parent,Number(row.carrier_minor),String(row.currency),carrierPlan);
+     action(parent,row.has_requested ? 'acceptFeeTerms' : 'quickDealRequest',[acceptTerms],async()=>{
+      await rpc('request_quick_deal',{p_deal:row.id,p_amount:row.carrier_minor,p_currency:row.currency,p_plan:carrierPlan});
+     });
     }
    });
   }
@@ -243,7 +264,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   const [applications,companies,opportunities,quotes,assignments,orders,history]=await Promise.all([
    unwrapQuery('partner_applications','id,state','applicant_id',userId),
    unwrapQuery('companies','name,services,coverage','owner_id',userId),
-   unwrapQuery('transport_opportunities','id,summary,open','partner_id',userId),
+   unwrapQuery('transport_opportunities','id,inquiry_id,summary,open','partner_id',userId),
    rows('transport_quotes','id,opportunity_id,status,amount_minor,currency,vat_treatment,valid_until'),
    unwrapQuery('transport_assignments','order_id,instructions','partner_id',userId),
    rows('transport_orders','id,inquiry_id'),
@@ -259,18 +280,38 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   }
   table(section('company'),companies,[['name','company'],['services','services'],['coverage','coverage']]);
   if(applications[0].state!=='approved') return;
+  carrierPlan=String(await rpc('my_carrier_plan',{}));
   if(quickDeal) await carrierDeals();
   const submitted=quotes.filter(row=>opportunities.some(opportunity=>opportunity.id===row.opportunity_id));
   table(section('opportunities'),opportunities.filter(row=>row.open),[['id','reference'],['summary','description']],(parent,row)=>{
+   questionPanel(parent,String(row.inquiry_id),false,true);
    if(!submitted.some(quote=>quote.opportunity_id===row.id)) {
-    action(parent,'submit',amountFields,async data=>{await rpc('submit_carrier_quote',{p_opportunity:row.id,...money(data)});});
+    const details=el('details');
+    details.append(el('summary',labels.submit));
+    const quote=form(details,[...amountFields,acceptTerms],labels.submit,async data=>{
+     await rpc('submit_carrier_quote',{p_opportunity:row.id,...money(data),p_plan:carrierPlan});
+     await refresh();
+    });
+    const preview=el('div');
+    preview.setAttribute('aria-live','polite');
+    quote.querySelector('label.portal-checkbox')?.before(preview);
+    const updatePreview=()=>{
+     const data=new FormData(quote);
+     preview.replaceChildren();
+     if(Number(read(data,'p_amount'))>0) showFee(preview,Number(read(data,'p_amount')),read(data,'p_currency'),carrierPlan);
+    };
+    quote.addEventListener('input',updatePreview);
+    parent.append(details);
    }
   });
   table(section('offers'),submitted,[['opportunity_id','opportunities'],...quoteColumns.slice(1)]);
   table(section('assignments'),assignments,[['order_id','orders'],['instructions','instructions']],(parent,row)=>{
    const order=orders.find(order=>order.id===row.order_id);
    if(!order) return;
+   chatLink(parent,order.id);
+   questionPanel(parent,String(order.inquiry_id),false,false);
    const current=history.find(item=>item.inquiry_id===order.inquiry_id)?.status;
+   if(current) parent.append(el('p',labels.status+' · '+text(String(current))));
    const next=partnerSteps[String(current)];
    if(next) action(parent,'update',[field('next','status',{options:options([next])})],async data=>{
     await rpc('advance_transport',{p_inquiry:order.inquiry_id,p_next:read(data,'next')});
@@ -313,6 +354,9 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
     ],async data=>{
      await rpc('update_company_coverage',{p_owner:row.applicant_id,p_services:read(data,'services'),p_coverage:read(data,'coverage')});
     });
+    if(row.applicant_id && row.state==='approved') action(parent,'setPlan',[
+     field('plan','feePlan',{options:options(['free','basic','pro'])})
+    ],async data=>{await rpc('set_carrier_plan',{p_partner:row.applicant_id,p_plan:read(data,'plan')});});
     if(row.applicant_id) action(parent,'review',[field('state','status',{options:options(['approved','rejected','suspended'])})],async data=>{
      await rpc('review_partner',{p_application:row.id,p_state:read(data,'state')});
     });
@@ -333,6 +377,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
     details.append(el('summary',[row.reference,row.origin,row.destination,text(String(row.status))].join(' · ')));
     if(row.contact_name) details.append(el('p',String(row.contact_name)));
     details.append(el('p',String(row.contact_email)),el('p',types.find(type=>type[0]===row.description)?.[language+1] ?? String(row.description)));
+    questionPanel(details,String(row.id),true,false);
     const guest=el('div');
     form(guest,[],labels.details,async ()=>{
      const receipt=await rpc('manager_guest_details',{p_inquiry:row.id}) as {reference:string;details:Record<string,unknown>}|null;
@@ -387,7 +432,31 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
     const deal=quickDeals.find(deal=>deal.reference===row.reference);
     const activeDeal=deal && ['available','acceptance_requested','reserved'].includes(String(deal.status));
     if(deal) manageDeal(details,deal,order,partnerOptions);
-    if(quickDeal && !deal && current==='awaiting_carrier_offer') draftDeal(details,row);
+    if(!deal && current==='awaiting_carrier_offer') {
+     const countries=new Intl.DisplayNames([document.documentElement.lang],{type:'region'});
+     const countryOptions=['SI','AT','DE','IT','HR','HU','FR','NL','BE','CH','GB','PL','CZ','SK']
+      .map(code=>[code,countries.of(code) ?? code] as [string,string]);
+     action(details,'publishLoad',[
+      field('visibility','publishChoice',{options:options(['privateListing','publicListing'])}),
+      field('category','cargo',{options:options(['vehicle','pallet','cargo','moving','express','special'])}),
+      field('origin','origin',{options:countryOptions}),field('destination','destination',{options:countryOptions}),
+      field('test','listingType',{options:options(['testListing','liveListing'])})
+     ],async data=>{
+      await rpc('publish_load',{p_inquiry:row.id,p_category:read(data,'category'),p_origin:read(data,'origin'),
+       p_destination:read(data,'destination'),p_test:read(data,'test')==='testListing',p_published:read(data,'visibility')==='publicListing'});
+     });
+     if(quickDeal) draftDeal(details,row);
+    }
+    if(order && partnerOptions.length && ['customer_accepted','carrier_assigned','scheduled'].includes(current)) {
+     action(details,'proposeFeeTerms',[field('partner','partner',{options:partnerOptions})],async data=>{
+      await rpc('propose_carrier_fee_terms',{p_order:order.id,p_partner:read(data,'partner')});
+     });
+     if(['carrier_assigned','scheduled'].includes(current)) action(details,'replaceCarrier',[
+      field('partner','partner',{options:partnerOptions}),field('instructions','instructions',{type:'textarea',max:4000}),
+      field('reason','reason',{max:500})
+     ],async data=>{await rpc('replace_transport_carrier',{p_order:order.id,p_partner:read(data,'partner'),
+      p_instructions:read(data,'instructions'),p_reason:read(data,'reason')});});
+    }
     if(current==='awaiting_carrier_offer') {
      if(partnerOptions.length && !activeDeal) action(details,'invite',[
       field('partner','partner',{options:partnerOptions}),field('summary','description',{type:'textarea',max:1500})
@@ -411,6 +480,187 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   table(section('deletion'),deletions,[['user_id','reference'],['created_at','date']]);
  }
 
+
+ let carrierPlan='free';
+ let conversations:Row[]=[];
+ const acceptTerms=field('accepted','acceptFeeTerms',{type:'checkbox'});
+ const link=(parent:HTMLElement,href:string,label:string)=>{
+  const anchor=el('a',text(label));
+  anchor.href=href;
+  parent.append(anchor);
+  return anchor;
+ };
+ function chatLink(parent:HTMLElement,orderId:Row[string]) {
+  const chat=conversations.find(row=>row.order_id===orderId);
+  if(chat) link(parent,'#chat-'+chat.id,'chat');
+ }
+ function showFee(parent:HTMLElement,amount:number,currency:string,plan:string) {
+  if(!Number.isSafeInteger(amount) || !['EUR','CHF','GBP'].includes(currency)) return;
+  const rate=({free:10,basic:7,pro:5} as Record<string,number>)[plan];
+  if(!rate) return;
+  const fee=Math.floor((amount*rate+50)/100);
+  const format=new Intl.NumberFormat(document.documentElement.lang,{style:'currency',currency});
+  parent.append(el('p',[
+   text(plan)+' · '+rate+' %',labels.feeBase+' '+format.format(amount/100),
+   labels.feeAmount+' '+format.format(fee/100),labels.feeNet+' '+format.format((amount-fee)/100)
+  ].join(' · ')));
+ }
+ function questionPanel(parent:HTMLElement,inquiry:string,canReply:boolean,canAsk:boolean) {
+  const details=el('details');
+  details.append(el('summary',labels.questions));
+  parent.append(details);
+  renderQuestions(details,inquiry,canReply,canAsk);
+ }
+ function renderQuestions(parent:HTMLElement,inquiry:string,canReply:boolean,canAsk:boolean) {
+  const contents=el('div');
+  const askPanel=el('div');
+  askPanel.hidden=true;
+  form(parent,[],labels.refreshQuestions,async()=>{
+   const [questions,publication]=await Promise.all([
+    rpc('list_load_questions',{p_inquiry:inquiry}) as Promise<Row[]>,
+    rpc('load_publication',{p_inquiry:inquiry}) as Promise<string|null>
+   ]);
+   contents.replaceChildren();
+   askPanel.hidden=Boolean(publication);
+   if(publication) link(contents,loadUrl+'?id='+publication,'publicListing');
+   if(!questions.length) contents.append(el('p',labels.empty));
+   for(const row of questions) {
+    const record=el('article');
+    record.append(el('h3',String(row.question)));
+    if(row.answer) record.append(el('p',String(row.answer)));
+    if(canReply && !row.hidden) {
+     if(row.public_submission) record.append(el('p',labels.publicQuestionHelp));
+     action(record,'reply',[field('body','answer',{type:'textarea',max:1500})],async data=>{
+      await rpc('answer_load_question',{p_question:row.id,p_body:read(data,'body')});
+     });
+    }
+    if(page==='manager') {
+     const choices=['hideQuestion',...(row.public_submission ? ['publishQuestion'] : []),
+      ...(row.public_submission && row.question_public && row.answer ? ['publishAnswer'] : [])];
+     action(record,'moderation',[field('moderation','moderation',{options:options(choices)})],async data=>{
+      await rpc('moderate_load_question',{p_question:row.id,p_action:read(data,'moderation')});
+     });
+    }
+    contents.append(record);
+   }
+  });
+  parent.append(contents);
+  if(canAsk) {
+   askPanel.append(el('p',labels.privateQuestionHelp));
+   const result=el('p');
+   result.setAttribute('role','status');
+   const ask=form(askPanel,[field('body','question',{type:'textarea',max:1000})],labels.ask,async data=>{
+    await rpc('ask_load_question',{p_load:inquiry,p_public:false,p_body:read(data,'body')});
+    ask.reset();
+    result.textContent=labels.questionReceived;
+   });
+   askPanel.append(result);
+   parent.append(askPanel);
+  }
+ }
+ function chatPanel() {
+  const panel=section('chat');
+  if(!conversations.length) panel.append(el('p',labels.empty));
+  for(const row of conversations) {
+   const details=el('details');
+   details.id='chat-'+row.id;
+   details.append(el('summary',String(row.reference)));
+   panel.append(details);
+   const log=el('div');
+   log.dataset.chatLog='';
+   log.setAttribute('role','log');
+   log.tabIndex=0;
+   details.append(log);
+   const load=async()=>{
+    const response=await client.from('transport_messages').select('body,created_at,sender_id')
+     .eq('conversation_id',row.id).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(100);
+    const messages=unwrap(response) as Row[];
+    log.replaceChildren();
+    if(!messages.length) log.append(el('p',labels.empty));
+    for(const message of messages.reverse()) log.append(el('p',
+     text(message.sender_id===userId ? 'you' : 'participant')+' · '+cell('created_at',message.created_at)+'\n'+message.body));
+    log.scrollTop=log.scrollHeight;
+   };
+   form(details,[],labels.refreshMessages,load);
+   details.addEventListener('toggle',()=>{
+    if(details.open) void load().catch(()=>log.replaceChildren(el('p',labels.error)));
+   });
+   let pending:{body:string;id:string}|undefined;
+   const composer=form(details,[field('body','message',{type:'textarea',max:4000})],labels.sendMessage,async data=>{
+    const message=read(data,'body').trim();
+    if(pending?.body!==message) pending={body:message,id:crypto.randomUUID()};
+    await rpc('send_transport_message',{p_conversation:row.id,p_request:pending.id,p_body:message});
+    composer.reset();
+    pending=undefined;
+    await load();
+   });
+  }
+ }
+ async function feesPanel() {
+  const panel=section('fees');
+  panel.append(el('p',labels.feesHelp));
+  if(page==='carrier') {
+   const terms=await rows('carrier_fee_terms','id,order_id,plan,amount_minor,currency,accepted_at');
+   panel.append(el('p',labels.feePlan+' · '+text(carrierPlan)));
+   table(panel,terms.map(row=>({...row,status:row.accepted_at?'confirmedTerms':'pendingTerms'})),
+    [['order_id','reference'],['status','status']],(parent,row)=>{
+     showFee(parent,Number(row.amount_minor),String(row.currency),String(row.plan));
+     if(!row.accepted_at) action(parent,'acceptFeeTerms',[acceptTerms],async()=>{
+      await rpc('confirm_carrier_fee_terms',{p_terms:row.id,p_amount:row.amount_minor,p_currency:row.currency,p_plan:row.plan});
+     });
+    });
+  }
+  const target=el('div');
+  const month=new Date().toISOString().slice(0,7);
+  const load=async(value:string)=>{
+   const start=new Date(value+'-01T00:00:00Z');
+   const end=new Date(start);
+   end.setUTCMonth(end.getUTCMonth()+1);
+   const entries:Row[]=[];
+   for(let first=0;;first+=100) {
+    const batch=unwrap(await client.from('carrier_fees')
+     .select('id,order_id,reference,plan,rate,base_minor,fee_minor,currency,created_at,voided_at,void_reason')
+     .gte('created_at',start.toISOString()).lt('created_at',end.toISOString())
+     .order('created_at',{ascending:false}).order('id').range(first,first+99)) as Row[];
+    entries.push(...batch);
+    if(batch.length<100) break;
+   }
+   target.replaceChildren();
+   if(!entries.length) target.append(el('p',labels.empty));
+   for(const entry of entries) {
+    const card=el('article');
+    card.append(el('h3',String(entry.reference)));
+    const format=new Intl.NumberFormat(document.documentElement.lang,{style:'currency',currency:String(entry.currency),currencyDisplay:'code'});
+    card.append(el('p',[text(String(entry.plan)),entry.rate+' %',labels.feeBase+' '+format.format(Number(entry.base_minor)/100),
+     labels.feeAmount+' '+format.format(Number(entry.fee_minor)/100)].join(' · ')));
+    card.append(el('p',text(entry.voided_at?'feeVoided':'feeRecorded')+' · '+cell('created_at',entry.created_at)));
+    if(entry.void_reason) card.append(el('p',labels.reason+' · '+entry.void_reason));
+    if(page==='manager' && !entry.voided_at) {
+     const order=await client.from('transport_orders').select('transport_inquiries(status)').eq('id',entry.order_id).maybeSingle();
+     const inquiry=unwrap(order)?.transport_inquiries as unknown as {status:string}|null;
+     if(inquiry?.status==='cancelled') action(card,'voidFee',[field('reason','reason',{max:500})],async data=>{
+      await rpc('void_carrier_fee',{p_fee:entry.id,p_reason:read(data,'reason')});
+     });
+    }
+    target.append(card);
+   }
+  };
+  form(panel,[field('month','feeMonth',{type:'month',value:month})],labels.search,async data=>load(read(data,'month')));
+  panel.append(target);
+  await load(month);
+ }
+ function focusChat() {
+  const id=window.location.hash.slice(1);
+  if(!id.startsWith('chat-')) return;
+  const details=document.getElementById(id);
+  if(details instanceof HTMLDetailsElement) {
+   details.open=true;
+   details.scrollIntoView({block:'start'});
+   details.querySelector('summary')?.focus({preventScroll:true});
+  }
+ }
+ window.addEventListener('hashchange',focusChat);
+
  async function unwrapQuery(table:string,columns:string,key:string,value:string) {
   return unwrap(await client.from(table).select(columns).eq(key,value).order('created_at',{ascending:false}).limit(100)) as unknown as Row[];
  }
@@ -420,14 +670,24 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   body.replaceChildren();
   show(labels.working);
   try {
+   if(page!=='manager') conversations=await rows('transport_conversations','id,order_id,reference');
    if(page==='customer') await customer();
    if(page==='carrier') await carrier();
    if(page==='manager') await manager();
-   const notifications=await unwrapQuery('notifications','id,event,read_at,created_at','recipient_id',userId);
+   if(page!=='manager') chatPanel();
+   if(page==='manager' || (page==='carrier' && await rpc('my_carrier_plan',{}))) await feesPanel();
+   const notifications=await unwrapQuery('notifications','id,event,read_at,created_at,conversation_id','recipient_id',userId);
    table(section('notifications'),notifications,[['event','notifications'],['created_at','date']],(parent,row)=>{
+    const chat=conversations.find(item=>item.id===row.conversation_id);
+    if(chat) link(parent,'#chat-'+chat.id,String(chat.reference));
     if(!row.read_at) action(parent,'markRead',[],async()=>{await rpc('mark_notification_read',{p_notification:row.id});});
    });
+   const nav=el('nav');
+   nav.setAttribute('aria-label',labels.overview);
+   for(const article of body.querySelectorAll<HTMLElement>(':scope > article[id]')) link(nav,'#'+article.id,article.id);
+   body.prepend(nav);
    show('');
+   focusChat();
   } catch {
    show(labels.error);
   }
