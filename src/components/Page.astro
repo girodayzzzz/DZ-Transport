@@ -59,7 +59,6 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
     {page==='terms' && settings.legal.contractualRole && <p>{settings.legal.contractualRole}</p>}
     {page==='privacy' && settings.privacy.provider && <p>{t(lang,['Ponudnik obrazcev','Form provider','Formulardienst'])} · {settings.privacy.provider}. {settings.privacy.retention || t(lang,['Rok hrambe bo določen pred objavo.','The retention period will be specified before launch.','Die Speicherdauer wird vor Veröffentlichung ergänzt.'])}</p>}
    </div>}
-   {page==='about' && <a class="more" href={settings.parentUrl}>DZ Auto Trade</a>}
    {page==='contact' && <a class="button primary" href={url(lang,'inquiry')}>{quote}</a>}
    {page==='confirmation' && <div data-confirmation-copy={JSON.stringify(confirmation)} hidden class="notice" role="status"><h2></h2><p data-reference></p><p>{confirmation.referenceNote}</p></div>}
    {(page==='missing'||page==='confirmation') && <a class="button primary" href={url(lang,'home')}>{t(lang,['Nazaj na začetno stran','Back to the home page','Zurück zur Startseite'])}</a>}
