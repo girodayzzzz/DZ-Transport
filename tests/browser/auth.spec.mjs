@@ -34,6 +34,7 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
  const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google,onboarding,quickDeal},labels:dictionary,links:paths});
  let profile=null;
  let requestedDeal=false;
+ let confirmed=false;
  const calls=[];
  await page.route(origin+'/**',async route=>{
   const url=new URL(route.request().url());
@@ -73,6 +74,7 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
    contentType:'text/html',
    body:'<a href="'+origin+links.callback+'?code=synthetic-oauth-code">Approve fixture consent</a>'
   });
+  if(url.pathname==='/rest/v1/user_roles') return respond(v7 || (quickDeal && url.searchParams.get('role')==='eq.partner') ? {id:'approved-role'} : null);
   if(v7) {
    const fixtures={
     public_load:[{category:'pallet',origin_country:'SI',destination_country:'DE',test_data:true,can_ask:false}],
@@ -84,7 +86,7 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
     transport_payments:[{id:orderId,inquiry_id:loadId,quote_id:loadId,kind:'quote',state:'checkout_pending',
      gross_minor:50000,commission_minor:5000,currency:'EUR',refunded_minor:0}],
     payment_activity:[{payment_id:orderId,event:'checkout_pending',created_at:'2026-11-26T12:00:00Z'}],
-    user_roles:[{id:'admin'}],manager_counts:[],manager_financials:[],
+    manager_counts:[],manager_financials:[],
     partner_applications:[{id:'application',state:'approved'}],my_carrier_plan:'basic',
     transport_inquiries:[{id:loadId,reference:loadReference,origin:'SI',destination:'DE',status:'scheduled'}],
     transport_orders:[{id:orderId,inquiry_id:loadId}],
@@ -125,7 +127,16 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
   }
   if(url.pathname==='/auth/v1/signup') return respond({user,session:null});
   if(url.pathname==='/auth/v1/recover') return respond({});
-  if(url.pathname==='/auth/v1/verify') return respond(session);
+  if(url.pathname==='/auth/v1/resend') {
+   if(data.email==='limited@example.invalid') return respond({code:'over_email_send_rate_limit'},429);
+   return data.email===user.email ? respond({}) : respond({code:'user_not_found',message:'Provider-specific error'},400);
+  }
+  if(url.pathname==='/auth/v1/verify') {
+   if(data.token_hash==='fixture-expired' || (data.type==='email' && confirmed))
+    return respond({code:'otp_expired',message:'Token has expired'},403);
+   if(data.type==='email') confirmed=true;
+   return respond(session);
+  }
   if(url.pathname==='/auth/v1/token') {
    return url.searchParams.get('grant_type')==='refresh_token'
     ? respond({message:'Refresh token invalid',error_code:'refresh_token_not_found'},400) : respond(session);
@@ -144,7 +155,7 @@ test('registration, email confirmation, sign-out and ordinary login',async({page
  await page.getByLabel('Email',{exact:true}).fill(user.email);
  await page.getByLabel('Password',{exact:true}).fill(secret);
  await page.getByRole('button',{name:'Register',exact:true}).click();
- await expect(page.locator('[data-portal-status]')).toHaveText(labels.mailSent);
+ await expect(page.locator('[data-portal-status]')).toHaveText(labels.registrationNext);
  expect(calls.find(call=>call.path.endsWith('/signup')).search).toContain(encodeURIComponent(origin+links.verify));
  await page.goto(origin+links.verify+'#token_hash=fixture-email&type=email');
  await expect(page).toHaveURL(origin+links.customer);
@@ -299,4 +310,56 @@ test('V8 customer can select a payable bid and resume its Stripe Checkout',async
   action:'checkout',kind:'quote',target:loadId,request:orderId
  });
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+
+test('confirmation works in a new browser context and invalid links offer generic resend',async({page,browser})=>{
+ const original=await setup(page);
+ await original.open('register');
+ await page.getByLabel(labels.email,{exact:true}).fill(user.email);
+ await page.getByLabel(labels.password,{exact:true}).fill(secret);
+ await page.getByRole('button',{name:labels.register,exact:true}).click();
+ await expect(page.locator('[data-portal-status]')).toHaveText(labels.registrationNext);
+ await expect(page.getByLabel(labels.email,{exact:true})).toHaveValue(user.email);
+
+ const device=await browser.newContext({viewport:{width:390,height:844}});
+ try {
+  const other=await device.newPage();
+  const {calls,open}=await setup(other);
+  await open('verify','#token_hash=fixture-email&type=email');
+  await expect(other).toHaveURL(origin+links.customer);
+  await expect(other.getByText(labels.inquiryAvailable)).toBeVisible();
+  await expect(other.getByText(labels.paymentsUnavailable)).toBeVisible();
+  expect(calls.find(call=>call.path.endsWith('/verify')).data).toMatchObject({token_hash:'fixture-email',type:'email'});
+
+  await open('verify','#token_hash=fixture-email&type=email');
+  await expect(other.locator('[data-portal-status]')).toHaveText(labels.linkUnavailable);
+  await open('verify','#token_hash=fixture-expired&type=email');
+  await expect(other.locator('[data-portal-status]')).toHaveText(labels.linkUnavailable);
+  await expect(other).toHaveURL(origin+links.verify);
+  for(const address of [user.email,'unrecognized@example.invalid','limited@example.invalid']){
+   await other.getByLabel(labels.email,{exact:true}).fill(address);
+   await other.getByRole('button',{name:labels.resendConfirmation,exact:true}).click();
+   await expect(other.getByText(labels.mailSent,{exact:true})).toBeVisible();
+   await expect(other.getByRole('button',{name:labels.resendConfirmation,exact:true})).toBeEnabled();
+  }
+  expect(calls.filter(call=>call.path.endsWith('/resend')).map(call=>call.data.type)).toEqual(['signup','signup','signup']);
+ } finally {await device.close();}
+});
+
+test('signed-out account and ordinary signed-in roles cannot load protected panels',async({page})=>{
+ const {calls,open}=await setup(page);
+ await open('account');
+ await expect(page.locator('[data-portal-status]')).toHaveText(labels.authRequired);
+ expect(calls.some(call=>call.path.startsWith('/rest/v1/'))).toBe(false);
+ await open('login');
+ await page.getByLabel(labels.email,{exact:true}).fill(user.email);
+ await page.getByLabel(labels.password,{exact:true}).fill(secret);
+ await page.getByRole('button',{name:labels.login,exact:true}).click();
+ await expect(page).toHaveURL(origin+links.customer);
+ for(const panel of ['manager','carrier']){
+  await open(panel);
+  await expect(page.locator('[data-portal-status]')).toHaveText(labels.accessDenied);
+  await expect(page.locator('#assignments, #overview')).toHaveCount(0);
+ }
 });

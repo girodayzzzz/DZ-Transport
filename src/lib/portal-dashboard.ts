@@ -158,6 +158,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   const related=(items:Row[])=>items.filter(row=>visible.has(row.inquiry_id))
    .map(row=>({...row,inquiry_id:visible.get(row.inquiry_id) ?? null}));
   const start=section('newInquiry');
+  start.append(el('p',labels.inquiryAvailable));
   if(receipt) {
    const result=el('p',labels.receipt+' '+receipt);
    result.setAttribute('role','status');
@@ -179,7 +180,12 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
     questionPanel(parent,String(row.id),true,false);
    });
   }
-  table(section('offers'),related(quotes.filter(row=>row.opportunity_id===null && row.status!=='draft')),quoteColumns,(parent,row)=>{
+  const offers=section('offers');
+  if(!quotes.some(row=>row.opportunity_id===null && row.status!=='draft') && !paymentsEnabled) {
+   offers.append(el('p',labels.offersAfterReview));
+  }
+  if(!paymentsEnabled) offers.append(el('p',labels.paymentsUnavailable));
+  table(offers,related(quotes.filter(row=>row.opportunity_id===null && row.status!=='draft')),quoteColumns,(parent,row)=>{
    if(row.status!=='sent' || paymentsEnabled) return;
    parent.append(el('p',labels.acceptHelp));
    action(parent,'accept',[],async()=>{await rpc('accept_customer_offer',{p_quote:row.id});});
@@ -338,12 +344,6 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   ]);
   const panel=section('application');
   table(panel,applications,[['state','status']]);
-  if(!applications.length) {
-   action(panel,'apply',[field('p_name','company',{max:160}),field('p_coverage','coverage',{max:500}),field('p_services','services',{max:500})],async data=>{
-    await rpc('apply_as_partner',{p_name:read(data,'p_name'),p_services:read(data,'p_services'),p_coverage:read(data,'p_coverage')});
-   });
-   return;
-  }
   table(section('company'),companies,[['name','company'],['services','services'],['coverage','coverage']]);
   if(applications[0].state!=='approved') return;
   carrierPlan=String(await rpc('my_carrier_plan',{}));

@@ -6,7 +6,7 @@ export type Field = {name:string; label:string; type?:string; min?:number; max?:
 
 export async function mountPortal(root:HTMLElement) {
  const {configuration,labels,links}=JSON.parse(root.dataset.init!) as {
-  configuration:{url:string;key:string;google:boolean;onboarding?:boolean;quickDeal?:boolean};
+  configuration:{url:string;key:string;google:boolean;partner?:boolean;onboarding?:boolean;quickDeal?:boolean};
   labels:Record<string,string>;
   links:Record<string,string>;
  };
@@ -90,6 +90,27 @@ export async function mountPortal(root:HTMLElement) {
  const password:Field={name:'password',label:labels.password,type:'password',autocomplete:'current-password'};
  const strongPassword={...password,min:12,max:72,autocomplete:'new-password'};
  const auth=client.auth;
+ const authLink=(target:string,caption:string)=>{
+  const link=el('a',caption);
+  link.href=links[target];
+  return link;
+ };
+ function resendConfirmation(address?:string) {
+  const section=el('section');
+  section.append(el('h2',labels.resendConfirmation));
+  const feedback=el('p');
+  feedback.setAttribute('role','status');
+  form(section,[{...email,value:address}],labels.resendConfirmation,async values=>{
+   try {
+    await auth.resend({type:'signup',email:value(values,'email').trim(),options:{emailRedirectTo:absolute(links.verify)}});
+   } catch {
+    // Use the same public response for every address and provider outcome.
+   }
+   feedback.textContent=labels.mailSent;
+  });
+  section.append(feedback,authLink('login',labels.login));
+  body.append(section);
+ }
  const googleButton=()=>{
   if(configuration.google) form(body,[],labels.google,async ()=>{
    ensure(await auth.signInWithOAuth({provider:'google',options:{redirectTo:absolute(links.callback)}}));
@@ -142,17 +163,23 @@ export async function mountPortal(root:HTMLElement) {
    const token=fragment.get('token_hash');
    const type=fragment.get('type');
    const code=query.get('code');
+   const recovering=type==='recovery' || query.get('type')==='recovery';
    if(token && (type==='email' || type==='recovery')) {
-    const result=unwrap(await auth.verifyOtp({token_hash:token,type}));
-    if (!result.session) throw new Error(labels.error);
-    if(type==='recovery') {
-     sessionStorage.setItem('dz-recovery',result.session.user.id);
-     move('reset');
-    } else move('customer');
+    const {data,error}=await auth.verifyOtp({token_hash:token,type});
+    if(!error && data.session) {
+     if(recovering) {
+      sessionStorage.setItem('dz-recovery',data.session.user.id);
+      move('reset');
+     } else move('customer');
+     return;
+    }
    } else if(code && page==='callback') {
-    ensure(await auth.exchangeCodeForSession(code));
-    move('customer');
-   } else show(query.size || fragment.size ? labels.error : labels.verifyHelp);
+    const {error}=await auth.exchangeCodeForSession(code);
+    if(!error) {move('customer');return;}
+   }
+   show(recovering ? labels.recoveryLinkUnavailable : query.size || fragment.size ? labels.linkUnavailable : labels.verifyHelp);
+   if(recovering) body.append(authLink('forgot',labels.forgot));
+   else resendConfirmation();
    return;
   }
   if(page==='login') {
@@ -160,6 +187,7 @@ export async function mountPortal(root:HTMLElement) {
     ensure(await auth.signInWithPassword({email:value(values,'email'),password:value(values,'password')}));
     move('customer');
    });
+   body.append(authLink('verify',labels.resendConfirmation));
    googleButton();
    return;
   }
@@ -171,8 +199,11 @@ export async function mountPortal(root:HTMLElement) {
      options:{emailRedirectTo:absolute(links.verify)}
     }));
     if(result.session) ensure(await auth.signOut());
-    show(labels.mailSent);
+    show(labels.registrationNext);
+    body.replaceChildren();
+    resendConfirmation(value(values,'email'));
    });
+   body.append(authLink('verify',labels.resendConfirmation));
    googleButton();
    return;
   }
@@ -256,6 +287,22 @@ export async function mountPortal(root:HTMLElement) {
     else ensure(await client.from('profiles').insert({id:user.id,display_name:name}));
     move('account');
    });
+   if(configuration.partner) {
+    const application=unwrap(await client.from('partner_applications').select('state').eq('applicant_id',user.id).maybeSingle());
+    if(!application?.state) {
+     const section=el('section');
+     section.append(el('h2',labels.apply));
+     form(section,[
+      {name:'name',label:labels.company,max:160},
+      {name:'coverage',label:labels.coverage,max:500},
+      {name:'services',label:labels.services,max:500}
+     ],labels.apply,async values=>{
+      ensure(await client.rpc('apply_as_partner',{p_name:value(values,'name'),p_coverage:value(values,'coverage'),p_services:value(values,'services')}));
+      move('account');
+     });
+     body.append(section);
+    } else if(application.state!=='approved') body.append(el('p',labels.application+' · '+(labels[application.state] ?? application.state)));
+   }
    const factors=unwrap(await auth.mfa.listFactors());
    if(factors && !factors.totp.length) {
     const enrollment=form(body,[],labels.mfa,async ()=>{
@@ -287,7 +334,7 @@ export async function mountPortal(root:HTMLElement) {
   } else {
    if(page==='manager') {
     const role=unwrap(await client.from('user_roles').select('id').eq('user_id',user.id).eq('role','admin').eq('approved',true).maybeSingle());
-    if(!role) {show(labels.accessDenied);return;}
+    if(!role?.id) {show(labels.accessDenied);return;}
     const assurance=unwrap(await auth.mfa.getAuthenticatorAssuranceLevel());
     if(assurance?.currentLevel!=='aal2') {
      const factors=unwrap(await auth.mfa.listFactors());
@@ -297,6 +344,14 @@ export async function mountPortal(root:HTMLElement) {
       ensure(await auth.mfa.challengeAndVerify({factorId:factor.id,code:value(values,'code')}));
       move('manager');
      });
+     return;
+    }
+   }
+   if(page==='carrier') {
+    const role=unwrap(await client.from('user_roles').select('id').eq('user_id',user.id).eq('role','partner').eq('approved',true).maybeSingle());
+    if(!role?.id) {
+     show(labels.accessDenied);
+     body.append(authLink('account',labels.account));
      return;
     }
    }
