@@ -27,7 +27,8 @@ export class BillingError extends Error {
 export const billingReply=(status,data)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 export function billingConfig(env) {
  return {env,account:env.DZ_STRIPE_BILLING_ACCOUNT_ID,portal:env.DZ_STRIPE_BILLING_PORTAL_ID,
-  tax:env.DZ_STRIPE_BILLING_TAX_BEHAVIOR,purchase:env.DZ_STRIPE_BILLING_PURCHASE_ENABLED==='true',
+  tax:env.DZ_STRIPE_BILLING_TAX_BEHAVIOR,production:env.DZ_SITE_MODE==='production',
+  purchaseSwitch:env.DZ_STRIPE_BILLING_PURCHASE_ENABLED==='true',
   prices:Object.fromEntries(Object.entries(plans).map(([plan,value])=>[plan,env[value.id]]))};
 }
 export const hasDatabase=env=>/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(env.SUPABASE_URL || '')
@@ -79,6 +80,7 @@ async function verifyPortal(config) {
 
 export async function verifyBilling(config) {
  const errors=[];
+ if(!config.production) errors.push('Billing purchases require DZ_SITE_MODE=production');
  if(!hasSigningSecret(config.env)) errors.push('Set DZ_STRIPE_BILLING_WEBHOOK_SECRET to the Billing Live destination secret');
  if(!['inclusive','exclusive'].includes(config.tax)) errors.push('Set DZ_STRIPE_BILLING_TAX_BEHAVIOR to the verified inclusive or exclusive setting');
  try {await checkAccount(config);}
@@ -154,7 +156,7 @@ function redirect(url,host) {
 }
 
 export async function startBillingCheckout(config,carrier,plan,language) {
- if(!config.purchase) throw new BillingError('Purchase disabled',503);
+ if(!config.production || !config.purchaseSwitch) throw new BillingError('Purchase disabled',503);
  if(!Object.hasOwn(plans,plan)) throw new BillingError('Invalid plan',400);
  const result=await verifyBilling(config);
  if(result.errors.length) throw new BillingError('Billing verification failed',503);

@@ -11,6 +11,7 @@ const metadata={dz_billing:'dz_transport_carrier_v1',dz_carrier:carrier,dz_billi
 const basic='price_1UgoRjLP0d1wngzHgpVmIeco';
 const pro='price_1UgoTHLP0d1wngzHEPAhJuL7';
 const fixture={
+ DZ_SITE_MODE:'production',
  SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_SECRET_KEY:'sb_secret_fixture',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture',
  DZ_STRIPE_BILLING_ACCOUNT_ID:'acct_fixture',DZ_STRIPE_BILLING_API_KEY:'rk_live_fictionalkey',DZ_STRIPE_BILLING_WEBHOOK_SECRET:'whsec_fixture',
  DZ_STRIPE_BILLING_BASIC_PRICE_ID:basic,DZ_STRIPE_BILLING_PRO_PRICE_ID:pro,DZ_STRIPE_BILLING_PORTAL_ID:'bpc_fixture',
@@ -97,7 +98,8 @@ test('checkout defaults off, validates origin and limits actions to approved car
  assert.ok(calls.every(call=>call.path.startsWith('/rest')));
  const approved=emulate(t);
  assert.equal((await action({action:'checkout',plan:'basic'},{...fixture,DZ_STRIPE_BILLING_PURCHASE_ENABLED:''})).status,503);
- assert.equal(approved.length,1);
+ assert.equal((await action({action:'checkout',plan:'basic'},{...fixture,DZ_SITE_MODE:'preview'})).status,503);
+ assert.equal(approved.length,2);
 });
 
 test('read-only Live diagnostics report exact deviations and disable checkout',async t=>{

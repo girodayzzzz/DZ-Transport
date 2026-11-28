@@ -13,12 +13,12 @@ export async function onRequestPost({request,env}) {
   const actor=await rpc(config,'carrier_billing_actor',{},token);
   if(input.action==='verify' && actor?.admin) {
    const result=await verifyBilling(config);
-   return billingReply(200,{verified:result.errors.length===0,purchaseSwitch:config.purchase,...result});
+   return billingReply(200,{verified:result.errors.length===0,purchaseSwitch:config.purchaseSwitch,...result});
   }
   if(!actor?.carrier) return billingReply(403,{error:'Approved carrier required'});
   if(input.action==='status') {
    const state=await rpc(config,'my_carrier_billing',{},token);
-   const verification=config.purchase ? await verifyBilling(config) : null;
+   const verification=config.production && config.purchaseSwitch ? await verifyBilling(config) : null;
    const enabled=verification?.errors.length===0;
    return billingReply(200,{state,purchase:enabled,tax:enabled?config.tax:null,portal:Boolean(state?.has_customer && config.portal)});
   }

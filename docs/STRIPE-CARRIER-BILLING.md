@@ -6,7 +6,9 @@ Portal prevoznika odpre Stripe Checkout. Veljavnost paketa potrdi plačan začet
 
 ## Cloudflare Pages Production
 
-Uporabi namenski projekt DZ Transport in produkcijsko okolje za `dz-transport.eu`. Skrivnosti vnesi neposredno v Cloudflare.
+Uporabi namenski projekt DZ Transport in produkcijsko okolje za `dz-transport.eu`. Nakup je mogoč samo v načinu `DZ_SITE_MODE=production`. Portal prevoznika potrebuje obstoječe nastavitve `PUBLIC_DZ_PORTAL=true`, `PUBLIC_DZ_PARTNER=true`, javne Supabase nastavitve in `BASE_PATH=/`. Skrbniško preverjanje zahteva tudi `PUBLIC_DZ_MANAGER=true`. Skrivnosti vnesi neposredno v Cloudflare.
+
+Produkcijska gradnja še vedno zahteva potrjene pravne nastavitve v `config/site.json` in konfigurirane poti obrazcev. Uporabi [obstoječi seznam za javni zagon](./PRODUCTION-READINESS.md) in izpolni dejanske odločitve. Predogled se lahko zgradi z izključenim nakupom.
 
 | Vrsta | Ime | Vrednost |
 | --- | --- | --- |
