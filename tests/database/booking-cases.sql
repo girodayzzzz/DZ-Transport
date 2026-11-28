@@ -233,4 +233,18 @@ begin
     and (payload->>'amount')::integer=45000)
  then raise exception 'Customer refund overwrote carrier commission or reversal exceeds transferred amount'; end if;
 end $$;
+-- Reviewed cleanup can remove an unbooked inquiry without touching an agreement or case.
+update public.transport_inquiries set archived_at=now()-interval '100 days'
+ where id='12100000-0000-0000-0000-000000000001';
+update public.transport_inquiries set archived_at=now()-interval '100 days',status='cancelled'
+ where id='12100000-0000-0000-0000-000000000008';
+do $$
+declare removed bigint;
+begin
+ removed:=dz_private.purge_archived_inquiries(now()-interval '90 days');
+ if removed<>1
+  or not exists(select 1 from public.transport_orders where inquiry_id='12100000-0000-0000-0000-000000000001')
+  or exists(select 1 from public.transport_inquiries where id='12100000-0000-0000-0000-000000000008')
+ then raise exception 'Cleanup removed a booking or retained an expired draft'; end if;
+end $$;
 rollback;

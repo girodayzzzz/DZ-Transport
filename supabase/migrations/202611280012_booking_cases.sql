@@ -2,8 +2,8 @@ begin;
 
 -- New offers carry explicit agreed terms. Existing records retain their original workflow.
 create table dz_private.booking_offer_terms (
- bid_id uuid primary key references public.transport_quotes on delete restrict,
- customer_quote_id uuid unique references public.transport_quotes on delete restrict,
+ bid_id uuid primary key references public.transport_quotes on delete cascade,
+ customer_quote_id uuid unique references public.transport_quotes on delete set null,
  carrier_id uuid references auth.users on delete set null,
  carrier_name text not null,
  schedule text not null check(length(btrim(schedule)) between 1 and 500),
@@ -71,6 +71,21 @@ alter table dz_private.booking_cancellation_history enable row level security;
 alter table dz_private.booking_commission_claims enable row level security;
 revoke all on dz_private.booking_offer_terms,dz_private.booking_agreements,dz_private.booking_cancellations,
  dz_private.booking_cancellation_history,dz_private.booking_commission_claims from public,anon,authenticated;
+
+-- The existing operator-run cleanup may remove unbooked drafts after review.
+-- Preserve all booked orders and payment records until a separate retention rule is approved.
+create or replace function dz_private.purge_archived_inquiries(p_cutoff timestamptz)
+returns bigint language plpgsql set search_path='' as $$
+declare removed bigint;
+begin
+ if p_cutoff is null or p_cutoff>=now() then raise exception 'Invalid cutoff'; end if;
+ delete from public.transport_inquiries i
+ where i.archived_at<p_cutoff and i.status in ('completed','cancelled')
+  and not exists(select 1 from public.transport_orders o where o.inquiry_id=i.id)
+  and not exists(select 1 from public.transport_payments p where p.inquiry_id=i.id);
+ get diagnostics removed=row_count;
+ return removed;
+end $$;
 
 create function public.submit_booking_offer(p_opportunity uuid,p_amount integer,p_currency text,p_vat text,p_valid date,
  p_plan text,p_schedule text,p_conditions text) returns void
