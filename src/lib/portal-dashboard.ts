@@ -3,6 +3,7 @@ import {cargo,cargoItem,companyFields,consents,customer as customerFields,locati
 import type {Field} from './portal';
 import {paymentCopy} from './v8-copy';
 import {bookingCopy} from './booking-copy';
+import {billingCopy} from './billing-copy';
 
 type Context = {
  client:SupabaseClient;
@@ -25,6 +26,11 @@ type BookingOrder = {
  customer_payment_state:string|null; refunded_minor:number|null; commission_deadline:string|null;
  cases:BookingCase[];
 };
+type BillingState = {
+ plan:'free'|'basic'|'pro'; subscription_plan:'basic'|'pro'|null; state:string;
+ paid_until:string|null; period_end:string|null; cancel_at_end:boolean; has_customer:boolean;
+};
+type BillingStatus = {state:BillingState; purchase:boolean; tax:'inclusive'|'exclusive'|null; portal:boolean};
 type BookingCase = {
  id:string; requester_role:string; reason:string; description:string; transport_status:string; state:string;
  responsible:string|null; created_at:string; history:{action:string;detail:string;created_at:string}[];
@@ -36,7 +42,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
  const language=['sl','en','de'].indexOf(document.documentElement.lang);
  const v8Labels=paymentCopy(language);
  Object.assign(v8Labels, {in_transit:labels.in_transit || v8Labels.in_transit});
- labels={...labels,...v8Labels,...bookingCopy(language)};
+ labels={...labels,...v8Labels,...bookingCopy(language),...billingCopy(language)};
  let paymentsEnabled=false;
  let paymentRows:Row[]=[];
  let bookingOrders:BookingOrder[]=[];
@@ -372,6 +378,63 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   if(!managedPayment) action(parent,'quickDealCancel',[],async()=>{await rpc('cancel_quick_deal',{p_deal:deal.id});});
  }
 
+ async function billingAPI(input:Record<string,unknown>) {
+  const {data,error}=await client.auth.getSession();
+  if(error || !data.session) throw new Error(labels.billingUnavailable);
+  const response=await fetch('/api/stripe/billing',{
+   method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+data.session.access_token},
+   body:JSON.stringify({...input,language:document.documentElement.lang})
+  });
+  if(!response.ok) throw new Error(labels.billingUnavailable);
+  return response.json();
+ }
+
+ async function billingPanel() {
+  const panel=section('billingPlans');
+  const live=window.location.origin==='https://dz-transport.eu';
+  const result:BillingStatus|null=live ? await billingAPI({action:'status'}).catch(()=>null) : null;
+  const state=result?.state ?? await rpc('my_carrier_billing',{}).catch(()=>null) as BillingState|null;
+  if(state?.plan) carrierPlan=state.plan;
+  if(live && !result) panel.append(el('p',labels.billingUnavailable));
+  if(state?.state) panel.append(el('p',[labels.feePlan,text(carrierPlan),text('billing_'+state.state)]
+   .concat(state.subscription_plan && state.subscription_plan!==state.plan ? [text(state.subscription_plan)] : []).join(' · ')));
+  if(state?.paid_until) {
+   const caption=Date.parse(state.paid_until)>Date.now()?labels.billingPaidUntil:labels.billingPaidEnded;
+   panel.append(el('p',caption+' · '+cell('created_at',state.paid_until)));
+  }
+  if(state?.cancel_at_end && state.period_end) {
+   panel.append(el('p',labels.billingEnds+' · '+cell('created_at',state.period_end)));
+  } else if(state?.state==='active' && state.period_end) {
+   panel.append(el('p',labels.billingRenews+' · '+cell('created_at',state.period_end)));
+  }
+  if(new URLSearchParams(window.location.search).get('billing')==='processing' && carrierPlan==='free'
+   && !['past_due','canceled','unpaid','incomplete_expired'].includes(state?.state ?? '')) {
+   const message=el('p',labels.billingProcessing);
+   message.setAttribute('role','status');
+   panel.append(message);
+  }
+  if(result?.tax) panel.append(el('p',result.tax==='inclusive'?labels.billingInclusive:labels.billingExclusive));
+  if(!result?.purchase) panel.append(el('p',labels.billingDisabled));
+  const active=state?.state;
+  const canStart=Boolean(result?.purchase && carrierPlan==='free'
+   && (!active || ['free','checkout','canceled','incomplete_expired'].includes(active)));
+  const currency=new Intl.NumberFormat(document.documentElement.lang,{style:'currency',currency:'EUR'});
+  for(const [plan,amount,commission] of [['free',0,10],['basic',19,7],['pro',49.9,5]] as const) {
+   panel.append(el('h3',text(plan)),el('p',[currency.format(amount)+' '+labels.billingMonth,commission+' % '+labels.billingCommission].join(' · ')));
+   if(plan!=='free' && canStart) form(panel,[],labels.buy+' '+text(plan),async()=>{
+    const session=await billingAPI({action:'checkout',plan});
+    window.location.assign(session.url);
+   });
+  }
+  if(result?.portal) {
+   panel.append(el('p',labels.billingManageHelp));
+   form(panel,[],labels.billingManage,async()=>{
+    const session=await billingAPI({action:'portal'});
+    window.location.assign(session.url);
+   });
+  }
+ }
+
  async function carrier() {
   const [applications,companies,opportunities,quotes,assignments,orders,history]=await Promise.all([
    unwrapQuery('partner_applications','id,state','applicant_id',userId),
@@ -387,6 +450,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   table(section('company'),companies,[['name','company'],['services','services'],['coverage','coverage']]);
   if(applications[0]?.state!=='approved') return;
   carrierPlan=String(await rpc('my_carrier_plan',{}));
+  await billingPanel();
   if(quickDeal) await carrierDeals();
   const submitted=quotes.filter(row=>opportunities.some(opportunity=>opportunity.id===row.opportunity_id));
   table(section('opportunities'),opportunities.filter(row=>row.open),[['id','reference'],['summary','description']],(parent,row)=>{
@@ -394,7 +458,7 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
    if(!submitted.some(quote=>quote.opportunity_id===row.id)) {
     const details=el('details');
     details.append(el('summary',labels.submit));
-    details.append(el('p',labels.bindingBid));
+    details.append(el('p',labels.bindingBid),el('p',labels.billingOfferRate));
     let previewedAmount=0;
     const priceFields=paymentsEnabled ? [field('p_amount','amount',{type:'number',min:50,max:99999999}),
      field('p_currency','currency',{options:options(['EUR'])}),...amountFields.slice(2)] : amountFields;
@@ -470,6 +534,17 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
   const carrierOffers=new Map(await Promise.all(previewable.map(async row=>[row.id,
    await rpc('booking_offer_details',{p_quote:row.id}) as Row|null] as const)));
   const overview=section('overview');
+  if(window.location.origin==='https://dz-transport.eu') {
+   const results=el('div');
+   results.setAttribute('aria-live','polite');
+   form(overview,[],labels.billingVerify,async()=>{
+    const data=await billingAPI({action:'verify'}) as {verified:boolean;purchaseSwitch:boolean;errors:string[]};
+    results.replaceChildren(el('p',data.purchaseSwitch?labels.billingSwitchOn:labels.billingSwitchOff));
+    if(data.verified) results.append(el('p',labels.billingVerified));
+    else for(const error of data.errors) results.append(el('p',error));
+   });
+   overview.append(results);
+  }
   const counts=(stats as Row[])[0];
   if(counts) table(overview,[
    {name:labels.newInquiry,amount:counts.new_inquiries},
@@ -508,9 +583,6 @@ export async function mountDashboard({client,page,body,labels,form,show,el,unwra
     ],async data=>{
      await rpc('update_company_coverage',{p_owner:row.applicant_id,p_services:read(data,'services'),p_coverage:read(data,'coverage')});
     });
-    if(row.applicant_id && row.state==='approved') action(parent,'setPlan',[
-     field('plan','feePlan',{options:options(['free','basic','pro'])})
-    ],async data=>{await rpc('set_carrier_plan',{p_partner:row.applicant_id,p_plan:read(data,'plan')});});
     if(row.applicant_id) action(parent,'review',[field('state','status',{options:options(['approved','rejected','suspended'])})],async data=>{
      await rpc('review_partner',{p_application:row.id,p_state:read(data,'state')});
     });

@@ -5,7 +5,9 @@
     "/api/partner-application",
     "/api/transport-payments",
     "/api/stripe-transport-webhook",
-    "/api/transport-payment-jobs"
+    "/api/transport-payment-jobs",
+    "/api/stripe/billing",
+    "/api/stripe/billing-webhook"
   ],
   "exclude": []
 }

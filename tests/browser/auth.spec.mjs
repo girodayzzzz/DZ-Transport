@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {portalCopy,portalTitles,statusLabels} from '../../src/lib/portal-copy.ts';
 import {paymentCopy} from '../../src/lib/v8-copy.ts';
 import {bookingCopy} from '../../src/lib/booking-copy.ts';
+import {billingCopy} from '../../src/lib/billing-copy.ts';
 
 const origin='https://portal-test.invalid';
 const project='https://dz-fixture.supabase.co';
@@ -29,7 +30,8 @@ const user={id:'cccccccc-cccc-4ccc-bccc-cccccccccccc',email:'customer@example.in
  email_confirmed_at:'2026-11-26T12:00:00Z',app_metadata:{},user_metadata:{},aud:'authenticated'};
 const secret='synthetic-test-password';
 
-async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='en',v7=false,v8=false,booking=false}={}) {
+async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='en',v7=false,v8=false,booking=false,billing=null}={}) {
+ const site=billing?'https://dz-transport.eu':origin;
  const paths=Object.fromEntries(Object.entries(v7Routes[lang]).map(([key,path])=>[key,base+'/'+(lang==='sl'?'':lang+'/')+path+'/']));
  const dictionary=localizedLabels(['sl','en','de'].indexOf(lang));
  const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google,onboarding,quickDeal},labels:dictionary,links:paths});
@@ -38,8 +40,14 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
  let confirmed=false;
  let cancellation=null;
  const calls=[];
- await page.route(origin+'/**',async route=>{
+ await page.route(site+'/**',async route=>{
   const url=new URL(route.request().url());
+  if(billing && url.pathname==='/api/stripe/billing') {
+   const data=route.request().postDataJSON();
+   calls.push({path:url.pathname,data});
+   if(data.action==='status') return route.fulfill({status:200,json:billing});
+   return route.fulfill({status:200,json:{url:'https://checkout.stripe.com/c/pay/synthetic'}});
+  }
   if(v8 && url.pathname==='/api/transport-payments') {
    const data=route.request().postDataJSON();
    calls.push({path:url.pathname,data});
@@ -60,7 +68,7 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
   const request=route.request();
   const url=new URL(request.url());
   const headers={
-   'access-control-allow-origin':origin,
+   'access-control-allow-origin':site,
    'access-control-allow-methods':'GET,POST,PUT,OPTIONS',
    'access-control-allow-headers':request.headers()['access-control-request-headers'] || '*'
   };
@@ -157,7 +165,7 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
   if(url.pathname.startsWith('/rest/v1/')) return respond([]);
   return respond({},404);
  });
- return {calls,dictionary,open:(key,suffix='')=>page.goto(origin+paths[key]+suffix)};
+ return {calls,dictionary,open:(key,suffix='')=>page.goto(site+paths[key]+suffix)};
 }
 
 test('registration, email confirmation, sign-out and ordinary login',async({page})=>{
@@ -316,6 +324,37 @@ for(const [index,lang] of ['sl','en','de'].entries()) test('Mobile booking cance
   p_order:orderId,p_reason:'changed_terms',p_detail:'Synthetic cancellation details'
  });
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+for(const [index,lang] of ['sl','en','de'].entries()) test('Live billing portal view · '+lang,async({page})=>{
+ const state={plan:'free',state:'checkout',has_customer:true};
+ const billing={state,purchase:true,tax:'inclusive',portal:true};
+ const {open,dictionary,calls}=await setup(page,{v7:true,lang,billing});
+ const copy=billingCopy(index);
+ await page.setViewportSize({width:360,height:780});
+ await page.route('https://checkout.stripe.com/**',route=>route.fulfill({status:200,body:'Synthetic Stripe Checkout'}));
+ await open('login');
+ await page.getByLabel(dictionary.email,{exact:true}).fill(user.email);
+ await page.getByLabel(dictionary.password,{exact:true}).fill(secret);
+ await page.getByRole('button',{name:dictionary.login,exact:true}).click();
+ await expect(page.getByRole('heading',{name:dictionary.inProgress,exact:true})).toBeVisible();
+ await open('carrier','?billing=processing');
+ const panel=page.locator('#billingPlans');
+ await expect(panel.getByText(copy.billingProcessing)).toBeVisible();
+ await expect(panel.getByText(copy.billingInclusive)).toBeVisible();
+ await expect(panel.getByRole('button',{name:copy.billingManage})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+ const pro=panel.getByRole('button',{name:copy.buy+' Pro'});
+ await pro.click();
+ await expect(page.getByText('Synthetic Stripe Checkout')).toBeVisible();
+ expect(calls.at(-1)?.data).toMatchObject({action:'checkout',plan:'pro',language:lang});
+ state.plan='basic';
+ state.state='active';
+ state.cancel_at_end=true;
+ state.paid_until=state.period_end='2032-03-01T12:00:00Z';
+ await open('carrier');
+ await expect(panel.getByText(new RegExp(copy.billingEnds))).toBeVisible();
+ await expect(pro).toHaveCount(0);
 });
 
 test('V8 customer can select a payable bid and resume its Stripe Checkout',async({page})=>{
