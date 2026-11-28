@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {portalCopy,portalTitles,statusLabels} from '../../src/lib/portal-copy.ts';
 import {paymentCopy} from '../../src/lib/v8-copy.ts';
+import {bookingCopy} from '../../src/lib/booking-copy.ts';
 
 const origin='https://portal-test.invalid';
 const project='https://dz-fixture.supabase.co';
@@ -28,13 +29,14 @@ const user={id:'cccccccc-cccc-4ccc-bccc-cccccccccccc',email:'customer@example.in
  email_confirmed_at:'2026-11-26T12:00:00Z',app_metadata:{},user_metadata:{},aud:'authenticated'};
 const secret='synthetic-test-password';
 
-async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='en',v7=false,v8=false}={}) {
+async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='en',v7=false,v8=false,booking=false}={}) {
  const paths=Object.fromEntries(Object.entries(v7Routes[lang]).map(([key,path])=>[key,base+'/'+(lang==='sl'?'':lang+'/')+path+'/']));
  const dictionary=localizedLabels(['sl','en','de'].indexOf(lang));
  const init=JSON.stringify({configuration:{url:project,key:'sb_publishable_mock',google,onboarding,quickDeal},labels:dictionary,links:paths});
  let profile=null;
  let requestedDeal=false;
  let confirmed=false;
+ let cancellation=null;
  const calls=[];
  await page.route(origin+'/**',async route=>{
   const url=new URL(route.request().url());
@@ -81,6 +83,10 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
     public_load_questions:[{question:'Synthetic public question',answer:'Synthetic public answer'}],
     list_load_questions:[],load_publication:null,
     v8_available:v8,
+    booking_offer_details:v8 ? {carrier:'Synthetic Carrier',amount_minor:50000,currency:'EUR',vat:'Fixture',
+     origin:'Murska Sobota',destination:'Maribor',schedule:'Monday 10:00',conditions:'Vehicle rolls and steers',valid_until:'2026-12-31'} : null,
+    booking_order_cases:booking?[{order_id:orderId,inquiry_id:loadId,reference:loadReference,
+     origin:'Murska Sobota',destination:'Maribor',status:'scheduled',party:'customer',cases:cancellation?[cancellation]:[]}]:[],
     v8_customer_bids:[{id:loadId,inquiry_id:loadReference,amount_minor:50000,currency:'EUR',vat_treatment:'Fixture',
      valid_until:'2026-12-31',status:'sent'}],
     transport_payments:[{id:orderId,inquiry_id:loadId,quote_id:loadId,kind:'quote',state:'checkout_pending',
@@ -100,6 +106,11 @@ async function setup(page,{onboarding=false,google=false,quickDeal=false,lang='e
    };
    const key=url.pathname.split('/').at(-1);
    if(Object.hasOwn(fixtures,key)) return respond(fixtures[key]);
+   if(key==='request_booking_cancellation') {
+    cancellation={id:loadId,reason:data.p_reason,description:data.p_detail,requester_role:'customer',state:'cancellation_pending',
+     transport_status:'scheduled',created_at:'2026-11-26T12:00:00Z',history:[],claim:null};
+    return respond(loadId);
+   }
    if(key==='send_transport_message') return route.fulfill({status:204,headers});
   }
   if(quickDeal && url.pathname==='/rest/v1/partner_applications') return respond([{id:'application',state:'approved'}]);
@@ -286,6 +297,27 @@ for(const lang of ['sl','en','de']) test('V7 mobile portal flows · '+lang,async
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
+for(const [index,lang] of ['sl','en','de'].entries()) test('Mobile booking cancellation · '+lang,async({page})=>{
+ const {open,dictionary,calls}=await setup(page,{v7:true,booking:true,lang});
+ const copy=bookingCopy(index);
+ await page.setViewportSize({width:360,height:780});
+ await open('login');
+ await page.getByLabel(dictionary.email,{exact:true}).fill(user.email);
+ await page.getByLabel(dictionary.password,{exact:true}).fill(secret);
+ await page.getByRole('button',{name:dictionary.login,exact:true}).click();
+ await page.locator('#orders').getByRole('link',{name:copy.bookingCases}).click();
+ const order=page.locator('#booking-'+orderId);
+ await order.locator('summary').filter({hasText:copy.requestCancellation}).click();
+ await order.locator('select[name=reason]').selectOption('changed_terms');
+ await order.getByLabel(dictionary.description,{exact:true}).fill('Synthetic cancellation details');
+ await order.getByRole('button',{name:copy.requestCancellation,exact:true}).click();
+ await expect(order.getByRole('heading',{name:copy.cancellation_pending,exact:true})).toBeVisible();
+ expect(calls.find(call=>call.path.endsWith('/request_booking_cancellation')).data).toEqual({
+  p_order:orderId,p_reason:'changed_terms',p_detail:'Synthetic cancellation details'
+ });
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
 test('V8 customer can select a payable bid and resume its Stripe Checkout',async({page})=>{
  const {calls,open,dictionary:copy}=await setup(page,{v7:true,v8:true,quickDeal:true});
  const paymentLabels=paymentCopy(1);
@@ -295,8 +327,10 @@ test('V8 customer can select a payable bid and resume its Stripe Checkout',async
  await page.getByLabel(copy.password,{exact:true}).fill(secret);
  await page.getByRole('button',{name:copy.login,exact:true}).click();
  const bids=page.locator('#payableBids');
- await expect(bids.getByText('€500.00')).toBeVisible();
+ await expect(bids.getByRole('cell',{name:'€500.00',exact:true})).toBeVisible();
+ await expect(bids.getByText('Synthetic Carrier')).toBeVisible();
  await bids.locator('summary').filter({hasText:paymentLabels.payBid}).click();
+ await bids.getByLabel(bookingCopy(1).bookingConfirm).check();
  await bids.getByRole('button',{name:paymentLabels.payBid}).click();
  await expect.poll(()=>calls.filter(call=>call.path==='/api/transport-payments').length).toBe(1);
  expect(calls.find(call=>call.path==='/api/transport-payments').data).toMatchObject({
