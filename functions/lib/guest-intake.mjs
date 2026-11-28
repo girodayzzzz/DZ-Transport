@@ -28,7 +28,7 @@ async function networkKey(secret,ip) {
 export function guestIntake({flag,action,validate,rpc,args}) {
  return async ({request,env})=>{
   const origin = httpsOrigin(env.DZ_SITE_ORIGIN);
-  if (!origin || env[flag]!=='true' || new URL(request.url).origin!==origin) return reply(404,{ok:false});
+  if (!['production','pilot'].includes(env.DZ_SITE_MODE) || !origin || env[flag]!=='true' || new URL(request.url).origin!==origin) return reply(404,{ok:false});
   if (request.method!=='POST') return reply(405,{ok:false});
   if (request.headers.get('Origin')!==origin || request.headers.get('Sec-Fetch-Site')==='cross-site') return reply(403,{ok:false});
   if(request.headers.get('content-type')?.split(';')[0]!=='application/json') return reply(415,{ok:false});

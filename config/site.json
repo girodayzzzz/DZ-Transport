@@ -33,7 +33,11 @@
   "businessHours": "24/7 (Europe/Ljubljana)",
   "vatApplicable": true,
   "legal": {
-    "contractualRole": "",
+    "contractualRole": {
+      "sl": "DZ Transport posreduje pri organizaciji prevoza. Pogodbo o prevozu skleneta stranka in izbrani prevoznik. Prevoznik opravi prevoz in stranki izda račun za prevoz. Naročnino prevoznika za uporabo platforme obračuna DZ Transport ločeno.",
+      "en": "DZ Transport acts as an intermediary in arranging carriage. The customer and the selected carrier enter into the carriage contract. The carrier performs the transport and invoices the customer for it. DZ Transport bills the carrier separately for any platform subscription.",
+      "de": "DZ Transport vermittelt die Beförderung. Der Kunde und das ausgewählte Transportunternehmen schließen den Beförderungsvertrag. Das Transportunternehmen führt den Transport aus und stellt dem Kunden die Rechnung. DZ Transport rechnet ein etwaiges Plattformabonnement separat mit dem Transportunternehmen ab."
+    },
     "approvalReference": ""
   }
 }

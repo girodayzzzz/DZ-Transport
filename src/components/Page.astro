@@ -1,5 +1,5 @@
 ---
-import {interactive,isProduction} from '../lib/site-config.mjs';
+import {localizedDisclosure, interactive,isProduction} from '../lib/site-config.mjs';
 import {corridors} from '../lib/corridors';
 import settings from '../../config/site.json';
 import {intro,t,titles,faq,process,booking,serviceDetails} from '../lib/content';
@@ -67,8 +67,8 @@ const confirmation=Object.fromEntries(['received','partnerReceived','reference',
     {settings.operator ? <p>{settings.operator}<br/>{settings.address}<br/>{t(lang,['Matična številka','Registration number','Registernummer'])} {settings.registration}<br/>{t(lang,['ID za DDV','VAT ID','USt-IdNr.'])} {settings.vat}</p> : <p>{t(lang,['Podatki bodo dodani pred objavo.','Details will be added before launch.','Die Angaben werden vor der Veröffentlichung ergänzt.'])}</p>}
     {settings.email && <p><a href={'mailto:'+settings.email}>{settings.email}</a></p>}{settings.telephone&&<p><a href={'tel:'+settings.telephone.replace(/\s/g,'')}>{settings.telephone}</a></p>}
     {page==='contact' && settings.businessHours && <p>{t(lang,['Delovni čas','Business hours','Geschäftszeiten'])} {settings.businessHours}</p>}
-    {page==='terms' && settings.legal.contractualRole && <p>{settings.legal.contractualRole}</p>}
-    {page==='privacy' && settings.privacy.provider && <p>{t(lang,['Ponudniki obdelave podatkov','Data service providers','Datenverarbeitungsdienstleister'])} · {settings.privacy.provider}. {settings.privacy.retention || t(lang,['Rok hrambe bo določen pred objavo.','The retention period will be specified before launch.','Die Speicherdauer wird vor Veröffentlichung ergänzt.'])}</p>}
+    {page==='terms' && settings.legal.contractualRole && <p>{localizedDisclosure(settings.legal.contractualRole,lang)}</p>}
+    {page==='privacy' && settings.privacy.provider && <p>{t(lang,['Ponudniki obdelave podatkov','Data service providers','Datenverarbeitungsdienstleister'])} · {localizedDisclosure(settings.privacy.provider,lang)}. {localizedDisclosure(settings.privacy.retention,lang) || t(lang,['Rok hrambe bo določen pred objavo.','The retention period will be specified before launch.','Die Speicherdauer wird vor Veröffentlichung ergänzt.'])}</p>}
    </div>}
    {page==='contact' && <a class="button primary" href={url(lang,'inquiry')}>{quote}</a>}
    {page==='confirmation' && <div data-confirmation-copy={JSON.stringify(confirmation)} hidden class="notice" role="status"><h2></h2><p data-reference></p><p data-next-step></p><p>{confirmation.referenceNote}</p></div>}
