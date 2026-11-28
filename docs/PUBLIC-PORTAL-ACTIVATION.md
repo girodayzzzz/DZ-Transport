@@ -1,0 +1,32 @@
+# Aktivacija portala na dz-transport.eu
+
+## Ugotovitev
+
+Dne 28. 11. 2026 so `/prijava/`, `/registracija/`, `/upravljanje/` in `/portal-prevozniki/` vrnili HTTP 200, vendar so bile strani iz predogledne gradnje. Prijava v SL, EN in DE je prikazovala, da portal še ni na voljo. Objavljena HTML stran ni vsebovala inicializacije Auth. To se zgodi še pred stikom s Supabase. Preveri **Production** okolje za zadnjo gradnjo `main` v namenskem projektu `dz-transport`. Manjkajoči `DZ_SITE_MODE` se obravnava kot `preview`. V predogledu javne zastavice ne odklenejo portala. Oba Form endpointa sta zavrnila prazni POST s 400. Billing in Billing webhook sta vrnila 404. Ta odziva ne potrdita nastavljenega Supabase ključa ali podpisne skrivnosti v dejanski objavi.
+
+## Potrjeno besedilo in odprte odločitve
+
+V konfiguraciji je potrjena pogodbena vloga v SL, EN in DE. Izbrani prevoznik sklene pogodbo s stranko, izvede prevoz in ga stranki zaračuna. DZ Transport posreduje in morebitno naročnino za uporabo platforme zaračuna prevozniku ločeno. Plačila prevozov v V8 ostanejo v testnem načinu.
+
+`privacy.provider`, `privacy.retention` in `legal.approvalReference` so prazni do potrditve. Delovni osnutek za pregled je spodaj.
+
+| Vnos | Potrjeno ali podprto z dejanskim tokom | Pred javno objavo |
+| --- | --- | --- |
+| `privacy.provider` | Cloudflare Pages gosti spletno mesto in Functions. Turnstile se uporablja pri omogočenih javnih obrazcih. Supabase DZ Transport je namenjen prijavi in hrambi podatkov portala in obrazcev. Ločen Stripe Billing je pripravljen za naročnine prevoznikov. | Potrdi dejanskega SMTP ponudnika in pošiljatelja ter vloge, lokacije, pogodbena varovala in dejansko vklopljene storitve. Stripe Live opiši v okviru naročnin. |
+| `privacy.retention` | 90 dni od zaključka povpraševanja brez naročila in šest mesecev od zaključka zavrnjene ali umaknjene prijave prevoznika. Pravili ne veljata za sprejete ponudbe ali odprte spore. Samodejno brisanje po teh rokih še ni vzpostavljeno. | Potrdi ostale roke ali merila za uporabniške račune, sprejeta naročila, klepet, spore, obračunske evidence, dnevnike in varnostne kopije. |
+| `legal.approvalReference` | Pogoji in zasebnost so osnutki v SL, EN in DE. | Po pregledu vpiši dejanski nenaslovni sklic na potrditev, na primer sklic na obstoječi zapis odobritve. |
+
+## Cloudflare in Supabase
+
+1. V Cloudflare pod **Workers & Pages → dz-transport → Deployments** primerjaj zadnji uspešni **Production / main** commit z GitHubom. Odpri podrobnosti gradnje in preveri izpis načina. V **Settings → Variables and Secrets**, v okolju **Production**, uporabi tabelo v [Production review](PRODUCTION-READINESS.md). Uporabi `SITE_URL=https://dz-transport.eu`, `DZ_SITE_ORIGIN=https://dz-transport.eu` in `BASE_PATH=/`. Za prijavo, admin in prevoznike nastavi `PUBLIC_DZ_PORTAL=true`, `PUBLIC_DZ_MANAGER=true` in `PUBLIC_DZ_PARTNER=true`.
+2. Za oba javna obrazca nastavi `PUBLIC_DZ_GUEST_INTAKE=true`, `DZ_GUEST_INTAKE=true`, `PUBLIC_DZ_GUEST_PARTNER_INTAKE=true` in `DZ_GUEST_PARTNER_INTAKE=true`. Na potrjeni produkcijski gradnji uporabi `DZ_SITE_MODE=production`. Gradnja preveri, da se javni in strežniški stikali ujemata. Poti Functions sprejemata oddajo samo v produkciji ali pilotskem načinu.
+3. Preveri, da oba Supabase URL-ja in oba publishable ključa pripadajo projektu `hgnwrtqpjxhidzeemaqb`. `PUBLIC_SUPABASE_PUBLISHABLE_KEY` se uporablja pri gradnji. `SUPABASE_PUBLISHABLE_KEY` se uporablja v Functions za overitev Billing zahtev. Preveri prisotnost strežniških skrivnosti v istem okolju, pri tem pa njihovih vrednosti ne izvažaj. Turnstile mora dovoliti `dz-transport.eu`. Javni ključ in skrivnost morata pripadati istemu gradniku.
+4. V Supabase **Authentication → URL Configuration** nastavi Site URL na `https://dz-transport.eu` in dodaj natančne povratne poti iz [SL, EN in DE seznama](../SUPABASE-SETUP.md#configure-urls-and-mail). Preveri potrditveno sporočilo in obnovitev gesla v pooblaščenem testnem nabiralniku.
+5. Ponovno objavi. Zaženi `node scripts/verify-hosted.mjs`. Izpis preveri inicializacijo portala in cilje obrazcev. Goli POST na obrazca brez Turnstile žetona mora vrniti 400. Billing brez prijave mora vrniti 401. Webhook brez podpisa mora vrniti 400. Pri novi gradnji 503 na Billing poti zahteva pregled strežniških Supabase nastavitev, 503 samo na webhooku pa tudi podpisno skrivnost. Ti odgovori ne dokazujejo dostave e-pošte, preveritve Turnstile, zapisa v bazo ali pravilne podpisne skrivnosti.
+6. Prijavi se na [Prijava](https://dz-transport.eu/prijava/) in v [Moj račun](https://dz-transport.eu/racun/) vpiši TOTP. Potrdi kodo. V Supabase preveri obstoječi račun in uporabi [SQL za dodelitev skrbnika s potrjenim TOTP](../SUPABASE-SETUP.md#create-the-first-administrator). Prizadeta mora biti točno ena vrstica. Odpri [Upravljanje](https://dz-transport.eu/upravljanje/) in dokončaj MFA. Preizkusi še, da običajni račun in skrbnik pri AAL1 nimata skrbniškega dostopa.
+7. Oddaj jasno označeno testno povpraševanje in ločeno testno prijavo prevoznika s testnim nabiralnikom. V upravljanju primerjaj obe referenci. Za potek ponudba → potrditev → klepet uporabi dodatno povpraševanje iz prijavljenega portala ter ločen odobren testni račun prevoznika. Gostujoče povpraševanje nima lastnika uporabniškega računa. Za test brez plačila uporabi okolje, kjer je V8 onemogočen.
+8. Ob `DZ_STRIPE_BILLING_PURCHASE_ENABLED=false` v skrbniškem portalu z MFA zaženi **Preveri Stripe Billing Live**. Portal konfiguracija je `bpc_1UgpN0LP0d1wngzH7LgJzL3e` po podatku lastnika. Diagnostika mora preveriti dejansko konfiguracijo pri Stripe. V Stripe Workbench preveri dostavo ustreznega podpisanega Live dogodka na `/api/stripe/billing-webhook` in odgovor 204. Če ni veljavnega dogodka, zabeleži, da podpisana dostava ostaja nepreverjena. [Stripe Billing](STRIPE-CARRIER-BILLING.md)
+
+## Zaprt pilot med pregledom
+
+Če potrditve še manjkajo, uporabi [zaprt Cloudflare pilot](CLOSED-PILOT.md) v okolju **Preview**. Alias za to vejo je predvidoma `https://codex-production-portal-readiness.dz-transport.pages.dev`. Preden deliš povezavo, preveri dejanski naslov in v odjavljenem brskalniku preveri Cloudflare Access na aliasu, naslovu commita in obeh API poteh. Tester potrebuje dostop Cloudflare Access ter po potrebi potrjen račun s pravico in MFA v Supabase. Predlagani alias sam po sebi še ni dokaz objavljenega ali zaščitenega pilota.

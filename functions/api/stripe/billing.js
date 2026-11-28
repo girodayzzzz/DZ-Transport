@@ -3,7 +3,8 @@ import {billingConfig,billingOrigin,billingReply,BillingError,hasDatabase,openBi
 import {readBody} from '../../lib/transport-payments.mjs';
 
 export async function onRequestPost({request,env}) {
- if(new URL(request.url).origin!==billingOrigin || !hasDatabase(env)) return billingReply(404,{error:'Unavailable'});
+ if(new URL(request.url).origin!==billingOrigin) return billingReply(404,{error:'Unavailable'});
+ if(!hasDatabase(env)) return billingReply(503,{error:'Billing unavailable'});
  if(request.headers.get('Origin')!==billingOrigin) return billingReply(403,{error:'Origin unavailable'});
  const token=request.headers.get('Authorization')?.match(/^Bearer (\S+)$/)?.[1];
  if(!token) return billingReply(401,{error:'Sign in required'});

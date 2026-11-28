@@ -41,7 +41,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' \
   https://dz-transport.eu/api/stripe/billing-webhook
 ```
 
-Po nastavitvi skrivnosti pričakuj `400` za nepodpisano zahtevo. `503` pred nastavitvijo pomeni, da podpisna skrivnost manjka ali je neveljavne oblike. Odziv `400` potrdi dostop do funkcije in obveznost podpisa. Veljavnost skrivnosti potrdi podpisan dogodek v Stripe Workbench.
+Po nastavitvi skrivnosti pričakuj `400` za nepodpisano zahtevo. `503` pred nastavitvijo pomeni, da manjka obvezna Supabase nastavitev ali veljavno oblikovana podpisna skrivnost. Odziv `400` potrdi dostop do funkcije in obveznost podpisa. Veljavnost skrivnosti potrdi podpisan dogodek v Stripe Workbench.
 
 ## Usklajevanje
 

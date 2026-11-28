@@ -2,8 +2,8 @@ import {applyBillingEvent,billingConfig,billingOrigin,billingVersion,hasDatabase
  signedBillingEvent} from '../../lib/carrier-billing.mjs';
 
 export async function onRequestPost({request,env}) {
- if(new URL(request.url).origin!==billingOrigin || !hasDatabase(env)) return new Response(null,{status:404});
- if(!hasSigningSecret(env)) return new Response(null,{status:503});
+ if(new URL(request.url).origin!==billingOrigin) return new Response(null,{status:404});
+ if(!hasDatabase(env) || !hasSigningSecret(env)) return new Response(null,{status:503});
  let event;
  try {event=await signedBillingEvent(request,env.DZ_STRIPE_BILLING_WEBHOOK_SECRET);}
  catch {return new Response(null,{status:400});}

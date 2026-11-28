@@ -102,6 +102,15 @@ test('checkout defaults off, validates origin and limits actions to approved car
  assert.equal(approved.length,2);
 });
 
+test('the canonical Billing route distinguishes missing Function bindings from unavailable hosts',async()=>{
+ const missing={...fixture,SUPABASE_PUBLISHABLE_KEY:''};
+ assert.equal((await action({action:'status'},missing)).status,503);
+ const request=new Request(billingOrigin+'/api/stripe/billing-webhook',{method:'POST',body:'{}'});
+ assert.equal((await webhook({request,env:missing})).status,503);
+ const other=new Request('https://dz-transport.pages.dev/api/stripe/billing',{method:'POST',body:'{}'});
+ assert.equal((await billing({request:other,env:fixture})).status,404);
+});
+
 test('read-only Live diagnostics report exact deviations and disable checkout',async t=>{
  const calls=emulate(t,{
   '/rest/v1/rpc/carrier_billing_actor':actor(true),

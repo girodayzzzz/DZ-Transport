@@ -10,6 +10,15 @@ export const isPilot = siteMode === 'pilot';
 export const interactive = isProduction || isPilot;
 export const legalPages = ['privacy', 'terms', 'cookies'];
 
+export function localizedDisclosure(value,language) {
+ const text=typeof value==='string' ? value : value?.[language];
+ return typeof text==='string' ? text.trim() : '';
+}
+
+function completeDisclosure(value) {
+ return ['sl','en','de'].every(language=>localizedDisclosure(value,language));
+}
+
 export function configurationIssues(config, mode, options = {}) {
  const issues = [];
  const origin = httpsOrigin(options.siteUrl ?? process.env.SITE_URL);
@@ -34,15 +43,44 @@ export function configurationIssues(config, mode, options = {}) {
  if (!config.vat?.trim() && config.vatApplicable !== false) issues.push('vat');
  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(config.email)) issues.push('email');
  if (!phoneValid(config.telephone)) issues.push('telephone');
- if (!config.privacy.retention?.trim()) issues.push('privacy.retention');
- if (!config.privacy.provider?.trim()) issues.push('privacy.provider');
- if (!config.legal.contractualRole?.trim()) issues.push('legal.contractualRole');
+ if (!completeDisclosure(config.privacy.retention)) issues.push('privacy.retention');
+ if (!completeDisclosure(config.privacy.provider)) issues.push('privacy.provider');
+ if (!completeDisclosure(config.legal.contractualRole)) issues.push('legal.contractualRole');
  if (!config.legal.approvalReference?.trim()) issues.push('legal.approvalReference');
  const inquiry = options.guestIntake ? origin && origin + '/api/inquiry' : endpoint(config.endpoints.inquiry);
  if (!inquiry) issues.push('endpoints.inquiry');
  const partner = options.guestPartnerIntake ? origin && origin + '/api/partner-application' : endpoint(config.endpoints.partner);
  if (!partner) issues.push('endpoints.partner');
  if (inquiry && inquiry === partner) issues.push('endpoints must be distinct');
+ return issues;
+}
+
+// These variables are visible at build time. Protected Function credentials are checked
+// at runtime, where Cloudflare binds them, and are never included in the build output.
+export function pagesDeploymentIssues(env) {
+ if(env.CF_PAGES!=='1' || !['production','pilot'].includes(env.DZ_SITE_MODE)) return [];
+ const issues=[];
+ const origin=httpsOrigin(env.SITE_URL);
+ if(env.DZ_SITE_MODE==='production' && (env.CF_PAGES_BRANCH!=='main' || origin!=='https://dz-transport.eu'))
+  issues.push('Cloudflare production requires main and SITE_URL=https://dz-transport.eu');
+ if(env.BASE_PATH && env.BASE_PATH!=='/') issues.push('BASE_PATH=/');
+ const publicPortal=env.PUBLIC_DZ_PORTAL==='true';
+ if(!publicPortal && ['PUBLIC_DZ_MANAGER','PUBLIC_DZ_PARTNER'].some(name=>env[name]==='true'))
+  issues.push('PUBLIC_DZ_PORTAL=true is required for manager and carrier panels');
+ const forms=[['PUBLIC_DZ_GUEST_INTAKE','DZ_GUEST_INTAKE'],['PUBLIC_DZ_GUEST_PARTNER_INTAKE','DZ_GUEST_PARTNER_INTAKE']];
+ const formsEnabled=forms.some(([name])=>env[name]==='true');
+ for(const [build,runtime] of forms) {
+  if((env[build]==='true')!==(env[runtime]==='true')) issues.push(build+' and '+runtime+' must agree');
+ }
+ if(formsEnabled && (!origin || httpsOrigin(env.DZ_SITE_ORIGIN)!==origin))
+  issues.push('DZ_SITE_ORIGIN must match SITE_URL');
+ if(formsEnabled && publicPortal && env.PUBLIC_SUPABASE_URL!==env.SUPABASE_URL)
+  issues.push('SUPABASE_URL must match PUBLIC_SUPABASE_URL');
+ if(env.DZ_SITE_MODE==='production') {
+  const projectUrl='https://hgnwrtqpjxhidzeemaqb.supabase.co';
+  if(publicPortal && env.PUBLIC_SUPABASE_URL!==projectUrl) issues.push('PUBLIC_SUPABASE_URL must use the DZ Transport project');
+  if(formsEnabled && env.SUPABASE_URL!==projectUrl) issues.push('SUPABASE_URL must use the DZ Transport project');
+ }
  return issues;
 }
 

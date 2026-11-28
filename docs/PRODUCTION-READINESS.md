@@ -14,7 +14,7 @@ For consumer orders, finalize precontract disclosures, the applicable withdrawal
 
 ## Privacy decisions
 
-Confirm the supplier and processing roles for Cloudflare Pages, Turnstile, Supabase (including Auth and database), the actual SMTP provider, and Stripe test processing. Verify whether the services are enabled in the intended environment, regions and subcontractors, processor agreements where applicable, and safeguards and access information for transfers outside the EEA. Confirm carrier/controller relationships, legal bases by purpose and the legitimate interests relied on, required fields and consequences, whether marketing runs, and retention periods or criteria by data category, including expired requests, partner applications, accounts, chat and backups. Use the published business address for rights requests. Review storage of sessions, Turnstile and any future analytics before approving the disclosures. [GDPR, Articles 5, 6, 13, 28 and 44 onward](https://eur-lex.europa.eu/eli/reg/2016/679/oj)
+Confirm the supplier and processing roles for Cloudflare Pages, Turnstile, Supabase (including Auth and database), the actual SMTP provider, Stripe Billing Live for subscriptions, and separate Stripe test processing for transport. Verify whether the services are enabled in the intended environment, regions and subcontractors, processor agreements where applicable, and safeguards and access information for transfers outside the EEA. Confirm carrier/controller relationships, legal bases by purpose and the legitimate interests relied on, required fields and consequences, whether marketing runs, and retention periods or criteria by data category, including expired requests, partner applications, accounts, chat and backups. Use the published business address for rights requests. Review storage of sessions, Turnstile and any future analytics before approving the disclosures. [GDPR, Articles 5, 6, 13, 28 and 44 onward](https://eur-lex.europa.eu/eli/reg/2016/679/oj)
 
 After review, replace pending language in all three versions of the policies and record the approved public provider and retention wording in `privacy.provider` and `privacy.retention`. Set `legal.contractualRole` to the approved role text and `legal.approvalReference` to a real, non-sensitive approval reference. The production build requires these fields. The confirmed business model is in the draft, and final public wording and approval still require review.
 
@@ -25,18 +25,19 @@ Verify Cloudflare project `dz-transport` uses repository `girodayzzzz/DZ-Transpo
 | Scope | Name | Expected setting |
 | --- | --- | --- |
 | Build | `NODE_VERSION`, `BASE_PATH` | `24`, `/` |
-| Build | `SITE_URL` | `https://dz-transport.pages.dev` |
+| Build | `SITE_URL` | `https://dz-transport.eu` |
 | Build | `DZ_SITE_MODE` | `production` after content approval |
 | Build | `PUBLIC_DZ_PORTAL` | `true` to expose portal auth |
 | Build | `PUBLIC_DZ_MANAGER`, `PUBLIC_DZ_PARTNER` | `true` for the respective panels. UI flags do not grant database roles |
 | Build | `PUBLIC_DZ_GUEST_INTAKE`, `PUBLIC_DZ_GUEST_PARTNER_INTAKE` | `true` for the inquiry and partner forms |
 | Build | `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | URL and publishable key for the same DZ Transport project. The portal requires the modern publishable key |
-| Build | `PUBLIC_TURNSTILE_SITE_KEY` | Public site key for the widget allowing the Pages hostname |
-| Runtime | `DZ_SITE_ORIGIN`, `SUPABASE_URL` | Exact public Pages origin and the same Supabase URL used by the portal. Both URL variables are needed |
+| Build | `PUBLIC_TURNSTILE_SITE_KEY` | Public site key for the widget allowing `dz-transport.eu` |
+| Runtime | `DZ_SITE_ORIGIN`, `SUPABASE_URL` | `https://dz-transport.eu` and `https://hgnwrtqpjxhidzeemaqb.supabase.co`. Both URL variables are needed |
 | Runtime | `DZ_GUEST_INTAKE`, `DZ_GUEST_PARTNER_INTAKE` | `true` for the corresponding Functions |
+| Runtime | `SUPABASE_PUBLISHABLE_KEY` | Same Supabase publishable key as the browser build. Used by the Billing Function to authenticate admin and carrier requests |
 | Runtime secrets | `SUPABASE_SECRET_KEY`, `TURNSTILE_SECRET`, `DZ_IP_HASH_KEY` | Supabase server key, matching widget secret, and a random secret of at least 32 characters |
 | Runtime payments | `DZ_STRIPE_TEST` | Keep disabled on the public site while payment and invoice flows are pending. If testing in isolation, follow the V8 test setup and use test keys and non-live webhooks |
 
 Verify approved carrier and administrator roles, TOTP enrollment and AAL2. In Supabase Auth check email signup and confirmation, custom SMTP provider, verified sender, localized redirect allowlist and templates. The public contact address does not establish the sender or SMTP provider. Check deliverability to an external test mailbox. Supabase's default SMTP has recipient restrictions. [Auth setup](../SUPABASE-SETUP.md#configure-urls-and-mail) · [Supabase SMTP](https://supabase.com/docs/guides/auth/auth-smtp) · [Cloudflare Pages bindings](https://developers.cloudflare.com/pages/functions/bindings/) · [Stripe test setup](STRIPE-V8-TEST.md)
 
-Before the public switch, run registration, confirmation, login and password reset in an authorized staging environment. Submit a synthetic inquiry and a separate carrier application, compare receipts to the manager records, verify an approved carrier's offer and assignment, and check private chat participation. Verify AAL1 and an ordinary user cannot use management endpoints, and an approved administrator with MFA can. Review the deployment and its form endpoints at the Pages hostname. Keep GitHub Pages in preview.
+Before the public switch, run registration, confirmation, login and password reset in an authorized staging environment. Submit a synthetic inquiry and a separate carrier application, compare receipts to the manager records, verify an approved carrier's offer and assignment, and check private chat participation. Verify AAL1 and an ordinary user cannot use management endpoints, and an approved administrator with MFA can. Review the deployment and its form endpoints on `dz-transport.eu`. For an exact checklist, blocked legal decisions, and no-charge Stripe verification, see [Public portal activation](PUBLIC-PORTAL-ACTIVATION.md). Keep GitHub Pages in preview.

@@ -39,7 +39,7 @@ test('guest intake verifies each section and recalculates item totals',()=>{
 test('guest endpoint requires approved origin, Turnstile and a confirmed database receipt',async t=>{
  const origin='https://transport.example';
  const env={
-  DZ_GUEST_INTAKE:'true',DZ_SITE_ORIGIN:origin,TURNSTILE_SECRET:'test',DZ_IP_HASH_KEY:'x'.repeat(32),
+  DZ_SITE_MODE:'production',DZ_GUEST_INTAKE:'true',DZ_SITE_ORIGIN:origin,TURNSTILE_SECRET:'test',DZ_IP_HASH_KEY:'x'.repeat(32),
   SUPABASE_URL:'https://test-ref.supabase.co',SUPABASE_SECRET_KEY:'stub'
  };
  const request=(override={})=>new Request(origin+'/api/inquiry',{
@@ -84,7 +84,7 @@ test('guest partner handler validates the public form and uses the partner Turns
  const {partner}=await import('../src/lib/form-schema.mjs');
  const origin='https://transport.example';
  const env={
-  DZ_GUEST_PARTNER_INTAKE:'true',DZ_SITE_ORIGIN:origin,TURNSTILE_SECRET:'fixture',DZ_IP_HASH_KEY:'x'.repeat(32),
+  DZ_SITE_MODE:'pilot',DZ_GUEST_PARTNER_INTAKE:'true',DZ_SITE_ORIGIN:origin,TURNSTILE_SECRET:'fixture',DZ_IP_HASH_KEY:'x'.repeat(32),
   SUPABASE_URL:'https://test-ref.supabase.co',SUPABASE_SECRET_KEY:'fixture'
  };
  const application=Object.fromEntries(partner.filter(field=>field.required).map(field=>[field.key,
@@ -106,6 +106,7 @@ test('guest partner handler validates the public form and uses the partner Turns
   return Response.json('12345678-1234-1234-1234-123456789abc');
  });
  assert.equal((await submitPartner({request:request(),env:{...env,DZ_GUEST_PARTNER_INTAKE:false}})).status,404);
+ assert.equal((await submitPartner({request:request(),env:{...env,DZ_SITE_MODE:'preview'}})).status,404);
  assert.equal((await submitPartner({request:request({permission:{privacy:false}}),env})).status,400);
  assert.equal((await submitPartner({request:request(),env})).status,403);
  assert.equal(databaseCalls,0);
