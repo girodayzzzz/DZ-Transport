@@ -118,5 +118,6 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/database/v8.sql
           psql -v ON_ERROR_STOP=1 -f tests/database/v9.sql
           psql -v ON_ERROR_STOP=1 -f tests/database/booking-cases.sql
+          psql -v ON_ERROR_STOP=1 -f tests/database/carrier-billing.sql
           bash tests/database/quick-deal-concurrency.sh
           bash tests/database/v8-concurrency.sh

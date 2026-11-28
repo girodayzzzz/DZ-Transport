@@ -27,7 +27,10 @@ update public.transport_quotes set valid_until=current_date-1 where opportunity_
 
 set local role authenticated;
 set local request.jwt.claims='{"sub":"12000000-0000-0000-0000-000000000003","aal":"aal2"}';
-select public.set_carrier_plan('12000000-0000-0000-0000-000000000002','pro');
+reset role;
+insert into dz_private.carrier_billing(carrier_id,stripe_account,subscription_plan,paid_until)
+ values('12000000-0000-0000-0000-000000000002','acct_fixture','pro',now()+interval '1 month');
+set local role authenticated;
 select public.prepare_booking_offer(id) from public.transport_quotes where opportunity_id is not null
  and status='sent' and valid_until>=current_date and inquiry_id::text like '12100000%' and right(inquiry_id::text,1)<='5';
 select public.advance_transport(id,'offer_sent') from public.transport_inquiries where id::text like '12100000%' and status='offer_prepared';
@@ -83,8 +86,8 @@ end $$;
 set local request.jwt.claims='{"sub":"12000000-0000-0000-0000-000000000002","aal":"aal1"}';
 do $$
 begin
- if (select count(*) from public.carrier_fees where base_minor=50000 and fee_minor=5000 and rate=10 and plan='free')<>5
- then raise exception 'Commission did not preserve the submitted plan'; end if;
+ if (select count(*) from public.carrier_fees where base_minor=50000 and fee_minor=2500 and rate=5 and plan='pro')<>5
+ then raise exception 'Commission did not use the plan at final acceptance'; end if;
  if not exists(select 1 from public.notifications where event='booking_cancellation') then raise exception 'Missing cancellation notice'; end if;
 end $$;
 select public.update_booking_cancellation(current_setting('booking.case1')::uuid,'object','The booking time was agreed');
@@ -151,8 +154,8 @@ select public.decide_booking_commission(current_setting('booking.claim3')::uuid,
 select public.decide_booking_commission(current_setting('booking.claim4')::uuid,true,false,'Both parties agreed');
 do $$
 begin
- if (select count(*) from public.carrier_fees where voided_at is not null and fee_minor=5000)<>3
-  or (select count(*) from public.carrier_fees where voided_at is null and fee_minor=5000)<>2
+ if (select count(*) from public.carrier_fees where voided_at is not null and fee_minor=2500)<>3
+  or (select count(*) from public.carrier_fees where voided_at is null and fee_minor=2500)<>2
  then raise exception 'Original fee or correction lost'; end if;
 end $$;
 
@@ -195,11 +198,11 @@ reset role;
 select set_config('booking.transfer',(public.v8_claim_operation('transfer:'||current_setting('booking.payment'))->'operation'->>'id'),true);
 do $$
 begin
- if (select (payload->>'amount')::integer from dz_private.payment_operations where id=current_setting('booking.transfer')::uuid) is distinct from 45000
+ if (select (payload->>'amount')::integer from dz_private.payment_operations where id=current_setting('booking.transfer')::uuid) is distinct from 47500
  then raise exception 'Transfer amount does not deduct the original fee once'; end if;
 end $$;
-select public.v8_finish_operation(current_setting('booking.transfer')::uuid,'{"id":"tr_booking","amount":45000}');
-select public.v8_finish_operation(current_setting('booking.transfer')::uuid,'{"id":"tr_booking","amount":45000}');
+select public.v8_finish_operation(current_setting('booking.transfer')::uuid,'{"id":"tr_booking","amount":47500}');
+select public.v8_finish_operation(current_setting('booking.transfer')::uuid,'{"id":"tr_booking","amount":47500}');
 
 set local role authenticated;
 set local request.jwt.claims='{"sub":"12000000-0000-0000-0000-000000000001","aal":"aal1"}';
@@ -228,9 +231,9 @@ select public.v8_payment_event('booking_refund',current_setting('booking.payment
 do $$
 begin
  if not exists(select 1 from public.transport_payments where id=current_setting('booking.payment')::uuid and
-  refunded_minor=50000 and commission_minor=5000 and settled_at is not null)
+  refunded_minor=50000 and commission_minor=2500 and settled_at is not null)
   or not exists(select 1 from dz_private.payment_operations where operation_key='reversal:'||current_setting('booking.payment')||':50000'
-    and (payload->>'amount')::integer=45000)
+    and (payload->>'amount')::integer=47500)
  then raise exception 'Customer refund overwrote carrier commission or reversal exceeds transferred amount'; end if;
 end $$;
 -- Reviewed cleanup can remove an unbooked inquiry without touching an agreement or case.

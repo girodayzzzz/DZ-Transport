@@ -72,7 +72,10 @@ begin
  if exists(select 1 from public.public_load_questions(current_setting('dz_test.load')::uuid)) then
   raise exception 'Hidden question exposed'; end if;
 end $$;
-select public.set_carrier_plan('77000000-0000-0000-0000-000000000002','basic');
+reset role;
+insert into dz_private.carrier_billing(carrier_id,stripe_account,subscription_plan,paid_until)
+ values('77000000-0000-0000-0000-000000000002','acct_fixture','basic',now()+interval '1 month');
+set local role authenticated;
 select public.prepare_customer_offer(current_setting('dz_test.inquiry')::uuid,125000,'EUR','Fixture VAT',current_date+7,100000,5000);
 select public.advance_transport(current_setting('dz_test.inquiry')::uuid,'offer_sent');
 select id as quote from public.transport_quotes where inquiry_id=current_setting('dz_test.inquiry')::uuid and opportunity_id is null \gset
@@ -101,8 +104,12 @@ select public.confirm_carrier_fee_terms(id,100000,'EUR','basic') from public.car
 
 set local request.jwt.claims='{"sub":"77000000-0000-0000-0000-000000000004","aal":"aal2"}';
 select public.assign_transport(:'order_id','77000000-0000-0000-0000-000000000002','Fixture instructions');
-select public.set_carrier_plan('77000000-0000-0000-0000-000000000002','free');
-select public.set_carrier_plan('77000000-0000-0000-0000-000000000003','pro');
+reset role;
+update dz_private.carrier_billing set paid_until=now()-interval '1 minute'
+ where carrier_id='77000000-0000-0000-0000-000000000002';
+insert into dz_private.carrier_billing(carrier_id,stripe_account,subscription_plan,paid_until)
+ values('77000000-0000-0000-0000-000000000003','acct_fixture','pro',now()+interval '1 month');
+set local role authenticated;
 select public.propose_carrier_fee_terms(:'order_id','77000000-0000-0000-0000-000000000003');
 do $$
 begin
