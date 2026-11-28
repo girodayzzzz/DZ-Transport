@@ -188,7 +188,7 @@ export async function startBillingCheckout(config,carrier,plan,language) {
   const url=returnURL(language);
   const metadata=meta(carrier,reservation.attempt);
   session=await stripe(config,'checkout/sessions',{key:'dz-carrier-checkout:'+reservation.attempt,body:{
-   mode:'subscription',customer,client_reference_id:carrier,locale:language==='sl'?'auto':language,
+   mode:'subscription',customer,client_reference_id:carrier,locale:language,
    'payment_method_types[0]':'card','line_items[0][price]':config.prices[plan],'line_items[0][quantity]':'1',
    'automatic_tax[enabled]':'true','tax_id_collection[enabled]':'true',billing_address_collection:'required',
    'customer_update[address]':'auto','customer_update[name]':'auto',
